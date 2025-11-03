@@ -8,8 +8,8 @@ for f in ~/.local/share/omarchy/themes/*; do ln -nfs "$f" ~/.config/omarchy/them
 
 # Set initial theme
 mkdir -p ~/.config/omarchy/current
-ln -snf ~/.config/omarchy/themes/tokyo-night ~/.config/omarchy/current/theme
-ln -snf ~/.config/omarchy/current/theme/backgrounds/1-scenery-pink-lakeside-sunset-lake-landscape-scenic-panorama-7680x3215-144.png ~/.config/omarchy/current/background
+ln -snf ~/.config/omarchy/themes/archenemy ~/.config/omarchy/current/theme
+ln -snf ~/.config/omarchy/current/theme/backgrounds/01.png ~/.config/omarchy/current/background
 
 # Set specific app links for current theme
 # ~/.config/omarchy/current/theme/neovim.lua -> ~/.config/nvim/lua/plugins/theme.lua is handled via omarchy-setup-nvim
