@@ -18,17 +18,12 @@ iwd
 jdk-openjdk
 libpulse
 libsass
-libva-nvidia-driver
 limine
 limine-mkinitcpio-hook
 limine-snapper-sync
 linux
 linux-firmware
 linux-headers
-nvidia-dkms
-nvidia-open-dkms
-nvidia-utils
-lib32-nvidia-utils
 pipewire
 pipewire-alsa
 pipewire-jack

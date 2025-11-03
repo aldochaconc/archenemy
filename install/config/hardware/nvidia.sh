@@ -54,13 +54,26 @@ if [ -n "$(lspci | grep -i 'nvidia')" ]; then
   # Define modules
   NVIDIA_MODULES="nvidia nvidia_modeset nvidia_uvm nvidia_drm"
 
+  # Detect hybrid graphics setup and prepend appropriate iGPU module
+  HYBRID_MODULES=""
+  if [ -n "$(lspci | grep -iE 'vga|3d|display' | grep -i 'intel')" ]; then
+    HYBRID_MODULES="i915 "
+    echo "Hybrid Intel+NVIDIA setup detected"
+  elif [ -n "$(lspci | grep -iE 'vga|3d|display' | grep -i 'amd')" ]; then
+    HYBRID_MODULES="amdgpu "
+    echo "Hybrid AMD+NVIDIA setup detected"
+  fi
+
+  # Combine hybrid and nvidia modules
+  ALL_MODULES="${HYBRID_MODULES}${NVIDIA_MODULES}"
+
   # Create backup
   sudo cp "$MKINITCPIO_CONF" "${MKINITCPIO_CONF}.backup"
 
-  # Remove any old nvidia modules to prevent duplicates
-  sudo sed -i -E 's/ nvidia_drm//g; s/ nvidia_uvm//g; s/ nvidia_modeset//g; s/ nvidia//g;' "$MKINITCPIO_CONF"
+  # Remove any old modules to prevent duplicates
+  sudo sed -i -E 's/ nvidia_drm//g; s/ nvidia_uvm//g; s/ nvidia_modeset//g; s/ nvidia//g; s/ i915//g; s/ amdgpu//g;' "$MKINITCPIO_CONF"
   # Add the new modules at the start of the MODULES array
-  sudo sed -i -E "s/^(MODULES=\\()/\\1${NVIDIA_MODULES} /" "$MKINITCPIO_CONF"
+  sudo sed -i -E "s/^(MODULES=\\()/\\1${ALL_MODULES} /" "$MKINITCPIO_CONF"
   # Clean up potential double spaces
   sudo sed -i -E 's/  +/ /g' "$MKINITCPIO_CONF"
 
