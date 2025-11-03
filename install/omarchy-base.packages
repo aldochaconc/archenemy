@@ -1,11 +1,8 @@
 # Omarchy core package list installed via install/packaging/base.sh
 # This file is also used by the ISO builder when determining needs
 
-1password-beta
-1password-cli
 aether
 alacritty
-asdcontrol
 avahi
 bash-completion
 bat
@@ -51,7 +48,6 @@ gnome-calculator
 gnome-keyring
 gnome-themes-extra
 grim
-gpu-screen-recorder
 gum
 gvfs-mtp
 gvfs-nfs
@@ -76,8 +72,6 @@ lazygit
 less
 libsecret
 libyaml
-libqalculate
-libreoffice
 llvm
 localsend
 luarocks
@@ -94,8 +88,6 @@ noto-fonts-emoji
 noto-fonts-extra
 nss-mdns
 nvim
-obs-studio
-obsidian
 omarchy-chromium
 omarchy-nvim
 pamixer
@@ -113,7 +105,6 @@ qt5-wayland
 ripgrep
 satty
 sddm
-signal-desktop
 slurp
 spotify
 starship
@@ -126,7 +117,6 @@ tree-sitter-cli
 ttf-cascadia-mono-nerd
 ttf-ia-writer
 ttf-jetbrains-mono-nerd
-typora
 tzupdate
 ufw
 ufw-docker
