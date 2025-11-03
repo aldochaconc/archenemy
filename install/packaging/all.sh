@@ -5,3 +5,4 @@ run_logged $OMARCHY_INSTALL/packaging/icons.sh
 run_logged $OMARCHY_INSTALL/packaging/webapps.sh
 run_logged $OMARCHY_INSTALL/packaging/tuis.sh
 run_logged $OMARCHY_INSTALL/packaging/zsh.sh
+run_logged $OMARCHY_INSTALL/packaging/aur.sh

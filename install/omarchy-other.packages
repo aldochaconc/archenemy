@@ -36,14 +36,6 @@ webp-pixbuf-loader
 wget
 yay-debug
 zram-generator
-lazyjournal
-posting
-yazi
-dbeaver
-cursor-bin
-slack-desktop
 zsh
 zsh-completions
-oh-my-zsh-git
 ttf-fira-code
-plymouth-theme-arch-breeze-git
