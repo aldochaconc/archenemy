@@ -1,6 +1,5 @@
-# Install zsh and related packages
 sudo pacman -S --noconfirm --needed zsh zsh-completions
-yay -S --noconfirm --needed oh-my-zsh-git || sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+
 rm -rf "$HOME/.oh-my-zsh"
 mkdir -p "$HOME/.config/zsh"
 

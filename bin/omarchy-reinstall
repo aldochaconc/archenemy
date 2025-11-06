@@ -16,7 +16,7 @@ if gum confirm "Are you sure you want to reinstall and lose all config changes?"
   mv ~/.local/share/omarchy-new $OMARCHY_PATH
 
   echo "Reinstalling missing Omarchy packages"
-  mapfile -t packages < <(grep -v '^#' "$OMARCHY_PATH/install/omarchy-base.packages" | grep -v '^$')
+  mapfile -t packages < <(grep -v '^#' "$OMARCHY_PATH/install/pacman.packages" | grep -v '^$')
   sudo pacman -Syu --noconfirm --needed "${packages[@]}"
 
   echo "Resetting all Omarchy configs"
