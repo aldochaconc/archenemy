@@ -63,10 +63,17 @@ _configure_desktop_display_manager() {
 #
 _configure_limine_and_snapper() {
   log_info "Configuring Limine bootloader and Snapper..."
-  _install_pacman_packages "limine" "snapper"
+  local limine_dependencies=(
+    limine
+    dosfstools
+    mtools
+    sbctl
+  )
+  _install_pacman_packages "${limine_dependencies[@]}" "snapper"
+  _install_aur_packages "limine-mkinitcpio-hook" "limine-snapper-sync"
   if ! command -v limine &>/dev/null; then
-    log_info "Limine bootloader not found. Skipping configuration."
-    return 0
+    log_error "Limine bootloader failed to install. Verify the pacman output above."
+    return 1
   fi
 
   # Define hooks for mkinitcpio with btrfs overlay support

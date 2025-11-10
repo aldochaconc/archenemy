@@ -35,6 +35,18 @@ The project is named `archenemy` (all lowercase).
 
 ## Installation Architecture
 
+### Quick Start
+
+1. Boot into a vanilla Arch environment (live ISO or freshly installed target) with working networking.
+2. Pull and run the bootstrapper:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash
+   ```
+   The script installs git, clones `~/.config/archenemy`, and launches `installation/boot.sh`.
+3. Follow the prompts; every step logs to `/var/log/archenemy-install.log`. If something fails, use `tail -f /var/log/archenemy-install.log` (or `make logs` in the VM harness) to inspect the failure before retrying.
+
+> You can rerun `~/.config/archenemy/installation/boot.sh` at any time; the installer is idempotent until the cleanup step completes.
+
 ### Orchestrator: `installation/boot.sh`
 
 Primary entry point once `install.sh` clones the repository. It exports the shared environment, wires error handling, and executes each step (`run_setup_*`) in sequence so shellcheck can resolve cross-step calls.
@@ -236,18 +248,19 @@ Supporting helpers: `_get_kernel()`, `_get_kernel_headers()`, `_has_gpu()`, `_ha
 **File**: `installation/steps/daemons.sh`  
 **Entry Point**: `run_setup_daemons()`
 
-**Description**: Finalizes core daemons: UFW firewall, systemd-resolved DNS, power profiles, and user-level monitors that must exist before the desktop session starts.
+**Description**: Finalizes core daemons: UFW firewall (now including SSH allowances), systemd-resolved DNS, OpenSSH server provisioning, power profiles, and user-level monitors that must exist before the desktop session starts.
 
 **Requirements**:
 
 - Packages (`ufw`, `ufw-docker`, `power-profiles-daemon`) installable
 - sudo privileges
 
-**TODO**: Installs/configures UFW (with Docker allowances), links `/etc/resolv.conf` to the stub resolver, sets balanced/performance profiles via `powerprofilesctl`, deploys the bundled battery monitor systemd units into the user daemon tree, and applies structural system service tweaks such as faster shutdown timeouts.
+**TODO**: Installs/configures UFW (with Docker + SSH allowances), links `/etc/resolv.conf` to the stub resolver, installs and enables OpenSSH for remote access (used by the VM harness), sets balanced/performance profiles via `powerprofilesctl`, deploys the bundled battery monitor systemd units into the user daemon tree, and applies structural system service tweaks such as faster shutdown timeouts.
 
 **Functions**:
 
-- `_configure_firewall()`: Installs UFW + ufw-docker, sets policies, opens installer-required ports, enables firewall service, reloads rules
+- `_configure_firewall()`: Installs UFW + ufw-docker, sets policies, opens installer-required ports (including SSH), enables firewall service, reloads rules
+- `_configure_ssh_access()`: Installs OpenSSH, enables/starts `sshd.service`, ensures password auth is available for the installer workflow
 - `_configure_dns_resolver()`: Symlinks `/etc/resolv.conf` to `/run/systemd/resolve/stub-resolv.conf`
 - `_configure_power_management()`: Installs `power-profiles-daemon`, sets the profile based on battery detection, and calls `_deploy_battery_monitor_timer()`
 - `_deploy_battery_monitor_timer()`: Copies `default/daemons/systemd/user/battery-monitor.{service,timer}` into `~/.config/systemd/user` and enables the timer when a user systemd session is active
@@ -303,14 +316,34 @@ The repository ships a thin QEMU harness for rapid iteration. All targets run fr
 - `make image` → creates/overwrites `archenemy-vm.qcow2` and seeds a writable OVMF vars file
 - `make run` → boots the ISO (`-boot d -cdrom ...`) for clean installs
 - `make run-installed` → boots directly from the QCOW2 disk (`-boot c`) after an install completes
+- `make logs` → SSHes into the guest and tails `/var/log/archenemy-install.log`
+- `make ssh` → opens an interactive SSH session (defaults to `$(USER)@localhost:5901` unless overridden)
 
-Networking defaults to QEMU’s user-mode NAT for portability. To attach the guest to a host tap/bridge, set:
+Networking is configurable via environment variables passed to `make`:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NETWORK_MODE` | `user` | `user` = built-in slirp NAT with hostfwd (works everywhere but ~20–30 Mb/s), `tap` = attach to an existing tap device via helper scripts, `bridge` = use `qemu-bridge-helper` with an existing Linux bridge (fastest + DHCP on LAN). |
+| `NETWORK_TAP_IF` | auto (`ip tuntap show` → first entry, falls back to `tap0`) | Tap interface name when `NETWORK_MODE=tap`. |
+| `NETWORK_TAP_UP` / `NETWORK_TAP_DOWN` | `/etc/qemu-ifup` / `/etc/qemu-ifdown` | Host scripts invoked by QEMU to bring the tap link up/down. |
+| `NETWORK_BRIDGE_IF` | auto (`ip -o link show type bridge` → first entry, falls back to `virbr0`) | Bridge to join when `NETWORK_MODE=bridge` (works well with libvirt/NetworkManager bridges). |
+| `NETWORK_BRIDGE_HELPER` | `/usr/lib/qemu/qemu-bridge-helper` | Helper binary QEMU uses to access privileged bridges. Ensure `/etc/qemu/bridge.conf` allows `bridge=...`. |
+
+> The Makefile auto-detects the first available tap (`ip tuntap show`) and bridge (`ip -o link show type bridge`) interfaces to seed the defaults above; if none are found it falls back to `tap0`/`virbr0`.
+
+Step 6 of the installer provisions OpenSSH (`sshd.service`) inside the guest, so the `logs`/`ssh` targets work immediately after the VM boots via the port-forward described above.
+
+Examples:
 
 ```bash
-NETWORK_MODE=tap NETWORK_TAP_IF=tap0 NETWORK_TAP_UP=/etc/qemu-ifup NETWORK_TAP_DOWN=/etc/qemu-ifdown make run-installed
+# Faster networking via qemu-bridge-helper (requires virbr0 + bridge.conf entry)
+NETWORK_MODE=bridge make run-installed
+
+# Custom tap scripts (configure tap0 once, then reuse)
+NETWORK_MODE=tap NETWORK_TAP_IF=tap0 NETWORK_TAP_UP=$HOME/bin/ifup-tap NETWORK_TAP_DOWN=$HOME/bin/ifdown-tap make run
 ```
 
-`QEMU_COMMON_ARGS` is shared by both run targets, so adjusting RAM/CPUs/devices only requires editing the variable once near the top of the Makefile.
+`QEMU_COMMON_ARGS` is shared by both run targets, so adjusting RAM/CPUs/devices only requires editing the variable once near the top of the Makefile. Networking args are appended automatically depending on `NETWORK_MODE`.
 
 ## LLM Implementation Guidelines
 

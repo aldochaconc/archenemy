@@ -12,6 +12,8 @@ DISK_FILE      := $(VM_DIR)/$(VM_NAME).qcow2
 DISK_SIZE      := 40G
 RAM_MB         := 4096
 CPUS           := 4
+
+# --- Device / Driver configuration ---
 GPU_DEVICE     := virtio-vga
 AUDIO_DEVICE   := ich9-intel-hda
 AUDIO_CODEC    := hda-duplex
@@ -40,11 +42,23 @@ UEFI_VARS_CANDIDATES := \
 UEFI_CODE      := $(firstword $(wildcard $(UEFI_CODE_CANDIDATES)))
 UEFI_VARS_SRC  := $(firstword $(wildcard $(UEFI_VARS_CANDIDATES)))
 UEFI_VARS      := $(VM_DIR)/OVMF_VARS.fd
-SPICE_PORT     := 5901
-SCRIPTS_DIR    := $(VM_DIR)/scripts
+SSH_FORWARD_PORT ?= 5901
+VM_SSH_HOST   ?= localhost
+VM_SSH_USER   ?= $(USER)
+SSH_OPTIONS   ?=
+LOG_LINES     ?= 200
+INSTALL_LOG_PATH ?= /var/log/archenemy-install.log
 MIRRORLIST_TMP := /tmp/mirrorlist
 MIRROR_CMD     = awk '/Server = / {gsub("^Server = ", "", $$0); sub("/\\$$repo.*", "", $$0); print $$0; exit}' /etc/pacman.d/mirrorlist 2>/dev/null
 MIRROR_URL     := $(shell $(MIRROR_CMD))
+DETECTED_BRIDGE_IF := $(strip $(shell ip -o link show type bridge 2>/dev/null | head -n1 | cut -d: -f2 | tr -d ' '))
+DETECTED_TAP_IF := $(strip $(shell ip tuntap show 2>/dev/null | head -n1 | cut -d: -f1))
+NETWORK_MODE   ?= user
+NETWORK_TAP_IF ?= $(if $(DETECTED_TAP_IF),$(DETECTED_TAP_IF),tap0)
+NETWORK_TAP_UP ?= /etc/qemu-ifup
+NETWORK_TAP_DOWN ?= /etc/qemu-ifdown
+NETWORK_BRIDGE_IF ?= $(if $(DETECTED_BRIDGE_IF),$(DETECTED_BRIDGE_IF),virbr0)
+NETWORK_BRIDGE_HELPER ?= /usr/lib/qemu/qemu-bridge-helper
 QEMU_COMMON_ARGS = \
  -enable-kvm \
  -name $(VM_NAME) \
@@ -59,8 +73,21 @@ QEMU_COMMON_ARGS = \
  -machine type=q35,accel=kvm \
  -cpu host \
  -drive if=pflash,format=raw,readonly=on,file=$(UEFI_CODE) \
- -drive if=pflash,format=raw,file=$(UEFI_VARS) \
- -net nic,model=virtio -net user,hostfwd=tcp::$(SPICE_PORT)-:22
+ -drive if=pflash,format=raw,file=$(UEFI_VARS)
+
+ifeq ($(NETWORK_MODE),tap)
+QEMU_NET_ARGS = \
+ -netdev tap,id=net0,ifname=$(NETWORK_TAP_IF),script=$(NETWORK_TAP_UP),downscript=$(NETWORK_TAP_DOWN) \
+ -device virtio-net-pci,netdev=net0
+else ifeq ($(NETWORK_MODE),bridge)
+QEMU_NET_ARGS = \
+ -netdev bridge,id=net0,br=$(NETWORK_BRIDGE_IF),helper=$(NETWORK_BRIDGE_HELPER) \
+ -device virtio-net-pci,netdev=net0
+else
+QEMU_NET_ARGS = \
+ -netdev user,id=net0,hostfwd=tcp::$(SSH_FORWARD_PORT)-:22 \
+ -device virtio-net-pci,netdev=net0
+endif
 
 BLUE   := $(shell printf "\033[1;34m")
 GREEN  := $(shell printf "\033[1;32m")
@@ -73,7 +100,7 @@ msg_done = @bash -c 'printf "$(GREEN)[DONE]$(RESET) %s\n" "$(1)"'
 msg_warn = @bash -c 'printf "$(YELLOW)[WARN]$(RESET) %s\n" "$(1)"'
 msg_err  = @bash -c 'printf "$(RED)[ERROR]$(RESET) %s\n" "$(1)"'
 
-.PHONY: all deps mirror iso image prepare run run-installed reset inspect bootstrap clean help
+.PHONY: all deps mirror iso image prepare run run-installed logs ssh clean help
 
 all: help
 
@@ -147,7 +174,7 @@ run:
 		echo "Disk image missing at $(DISK_FILE). Run 'make image' first."; \
 		exit 1; \
 	fi
-	qemu-system-x86_64 $(QEMU_COMMON_ARGS) \
+	qemu-system-x86_64 $(QEMU_COMMON_ARGS) $(QEMU_NET_ARGS) \
 	  -boot d \
 	  -cdrom $(ISO_FILE)
 	$(call msg_done,VM launched successfully.)
@@ -166,24 +193,17 @@ run-installed:
 		echo "Disk image missing at $(DISK_FILE). Run 'make image' first."; \
 		exit 1; \
 	fi
-	qemu-system-x86_64 $(QEMU_COMMON_ARGS) \
+	qemu-system-x86_64 $(QEMU_COMMON_ARGS) $(QEMU_NET_ARGS) \
 	  -boot c
 	$(call msg_done,Installed system booted successfully.)
 
-reset:
-	$(call msg_info,Resetting VM environment...)
-	bash $(SCRIPTS_DIR)/vm-reset.sh
-	$(call msg_done,VM reset complete.)
+logs:
+	$(call msg_info,Streaming installer log from $(VM_SSH_USER)@$(VM_SSH_HOST)...)
+	ssh $(SSH_OPTIONS) -p $(SSH_FORWARD_PORT) $(VM_SSH_USER)@$(VM_SSH_HOST) "sudo tail -n $(LOG_LINES) $(INSTALL_LOG_PATH)"
 
-inspect:
-	$(call msg_info,Inspecting VM resources...)
-	bash $(SCRIPTS_DIR)/vm-inspect.sh
-	$(call msg_done,Inspection complete.)
-
-bootstrap:
-	$(call msg_info,Running Archenemy bootstrap inside guest...)
-	bash $(SCRIPTS_DIR)/bootstrap.sh
-	$(call msg_done,Bootstrap executed inside VM.)
+ssh:
+	$(call msg_info,Opening SSH session to $(VM_SSH_USER)@$(VM_SSH_HOST)...)
+	ssh $(SSH_OPTIONS) -p $(SSH_FORWARD_PORT) $(VM_SSH_USER)@$(VM_SSH_HOST)
 
 clean:
 	$(call msg_warn,Removing generated files...)
@@ -201,9 +221,8 @@ help:
 	@echo "  $(BLUE)prepare$(RESET)    - Install deps, rank mirror, download ISO, and create disk"
 	@echo "  $(BLUE)run$(RESET)        - Launch VM from installer ISO"
 	@echo "  $(BLUE)run-installed$(RESET) - Boot the installed system from disk"
-	@echo "  $(BLUE)reset$(RESET)      - Reset VM environment"
-	@echo "  $(BLUE)inspect$(RESET)    - Inspect VM disk and metadata"
-	@echo "  $(BLUE)bootstrap$(RESET)  - Run installer inside VM"
+	@echo "  $(BLUE)logs$(RESET)       - Tail /var/log/archenemy-install.log via SSH"
+	@echo "  $(BLUE)ssh$(RESET)        - Open an SSH session to the guest"
 	@echo "  $(BLUE)clean$(RESET)      - Clean environment"
 	@echo "  $(BLUE)help$(RESET)       - Show this help message\n"
 	@echo "Example: make prepare && make run\n"

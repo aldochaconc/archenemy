@@ -20,7 +20,7 @@ set -euo pipefail
 
 # Configuration
 CUSTOM_REPO="${CUSTOM_REPO:-aldochaconc/archenemy}"
-CUSTOM_REF="${CUSTOM_REF:-main}"
+CUSTOM_REF="${CUSTOM_REF:-dev}"
 ARCHENEMY_PATH="$HOME/.config/archenemy"
 
 # Logging

@@ -145,7 +145,8 @@ _require_online_install() {
 # PACKAGE HELPERS
 # Thin wrappers around pacman/yay that keep logging consistent and soften the
 # calling code.
-#
+# Arguments:
+#   $1: The packages to install
 _install_pacman_packages() {
   if [[ $# -eq 0 ]]; then
     return 0
@@ -167,6 +168,9 @@ _install_aur_packages() {
 # Enabling services differs between chroot installs (where daemons cannot be
 # started) and live installs. This helper encapsulates that branching logic.
 #
+# Arguments:
+#   $1: The unit to enable
+#   $2: Additional arguments to pass to systemctl
 _enable_service() {
   local unit="$1"
   shift || true
@@ -189,6 +193,8 @@ _enable_service() {
 # Executes a command as the invoking non-root user (or falls back to the current
 # user when already unprivileged).
 #
+# Arguments:
+#   $1: The command to execute
 run_as_user() {
   local target_user="${SUDO_USER:-$USER}"
 

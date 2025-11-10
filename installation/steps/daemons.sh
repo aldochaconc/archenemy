@@ -24,12 +24,25 @@ _configure_firewall() {
   run_cmd sudo ufw default allow outgoing
   run_cmd sudo ufw allow 53317/udp
   run_cmd sudo ufw allow 53317/tcp
+  run_cmd sudo ufw allow 22/tcp comment 'allow-ssh'
   # Allow Docker DNS
   run_cmd sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 comment 'allow-docker-dns'
   run_cmd sudo ufw --force enable
   _enable_service "ufw"
   run_cmd sudo ufw-docker install
   run_cmd sudo ufw reload
+}
+
+################################################################################
+# SSH ACCESS
+# Installs and enables OpenSSH so the VM harness and remote maintenance can
+# connect without requiring a graphical session.
+# TODO: add templates for ssh config.
+_configure_ssh_access() {
+  log_info "Installing and enabling OpenSSH..."
+  _install_pacman_packages "openssh"
+  run_cmd sudo mkdir -p "$HOME/.ssh"
+  run_cmd sudo systemctl enable --now sshd
 }
 
 ################################################################################
@@ -118,13 +131,16 @@ run_setup_daemons() {
   # --- Sub-step 1: Configure system firewall ---
   _configure_firewall
 
-  # --- Sub-step 2: Configure systemd-resolved for DNS ---
+  # --- Sub-step 2: Provision SSH access ---
+  _configure_ssh_access
+
+  # --- Sub-step 3: Configure systemd-resolved for DNS ---
   _configure_dns_resolver
 
-  # --- Sub-step 3: Configure power management based on hardware ---
+  # --- Sub-step 4: Configure power management based on hardware ---
   _configure_power_management
 
-  # --- Sub-step 4: Apply supplemental system service tweaks ---
+  # --- Sub-step 5: Apply supplemental system service tweaks ---
   _configure_system_services
 
   log_success "Step 6: Daemons completed."
