@@ -27,6 +27,21 @@ ARCHENEMY_PATH="$HOME/.config/archenemy"
 log_info() { printf "\e[34m[INFO] %s\e[0m\n" "$1"; }
 log_error() { printf "\e[31m[ERROR] %s\e[0m\n" "$1" >&2; }
 
+require_online() {
+  if ping -c1 -W2 archlinux.org >/dev/null 2>&1; then
+    return
+  fi
+
+  if curl -fs --max-time 5 https://mirror.rackspace.com/archlinux/ >/dev/null 2>&1; then
+    return
+  fi
+
+  log_error "An active internet connection is required for the archenemy installer (per the Arch Linux installation guide)."
+  exit 1
+}
+
+require_online
+
 # Install git
 log_info "Installing git..."
 sudo pacman -Syu --noconfirm --needed git

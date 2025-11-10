@@ -10,7 +10,7 @@ archenemy evolves from omarchy, adopting a KISS (Keep It Simple, Stupid) approac
 
 ### Code Standards
 
-- **Environment Variables**: All environment variables are unified and declared in `installation/boot.sh`. Each function must use local variables to avoid polluting the global environment.
+- **Environment Variables**: All environment variables are unified in `installation/boot.sh` and `installation/common.sh`. Each function must use local variables to avoid polluting the global environment.
 - **shellcheck Compliance**: All scripts must pass shellcheck validation. Paths, functions, and commands are properly quoted and validated.
 - **Safe Scripting**: Use guards, conditionals, and Linux commands to validate compatibility during installation. Apply `set -euo pipefail` for error handling.
 - **Standardization**: The installer follows a standardized process up to the theming stage, ensuring consistency across installations.
@@ -37,276 +37,258 @@ The project is named `archenemy` (all lowercase).
 
 ### Orchestrator: `installation/boot.sh`
 
-The main entry point after repository cloning. Defines global environment variables, error handling, logging, and executes installation steps in sequence.
+Primary entry point once `install.sh` clones the repository. It exports the shared environment, wires error handling, and executes each step (`run_setup_*`) in sequence so shellcheck can resolve cross-step calls.
 
 **Responsibilities**:
 
-- Declare and export global environment variables
-- Define logging primitives (`log_info`, `log_success`, `log_error`)
-- Set up error trapping with `_handle_error`
-- Source and execute Steps 1-10 from `installation/steps/`
+- Declare and export canonical environment variables (paths, repo metadata, user info)
+- Set strict error handling (`set -euo pipefail`) and register `_handle_error`
+- Source `installation/common.sh` to expose helpers/loggers to the rest of the run
+- Source every script under `installation/steps/` and execute them in order (System Preparation → Bootloader → Drivers → Software → User Customization → Daemons → Cleanup → Reboot)
 
-### Helper Library: `installation/helpers.sh`
+### Common Library: `installation/common.sh`
 
-Shared utility functions used across multiple installation steps.
+Single shared shell library imported by `boot.sh` and every step script.
 
-**Functions**:
+**Responsibilities**:
 
-- `_install_pacman_packages`: Install packages via pacman
-- `_install_aur_packages`: Install packages via yay (AUR helper)
-- `_get_kernel_headers`: Detect and return appropriate kernel headers package
-- `_has_gpu`: Check for GPU presence by vendor
-- `_has_nvidia_open_gpu`: Check for NVIDIA GPUs compatible with open-source drivers
-- `_create_desktop_entry`: Generate .desktop files for TUI applications
-- `_create_webapp_entry`: Generate .desktop files for web applications
-- `_enable_service`: Enable systemd services (with chroot awareness)
+- Export canonical directories (`ARCHENEMY_DEFAULTS_DIR`, `ARCHENEMY_USER_DOTFILES_DIR`, `ARCHENEMY_INSTALL_FILES_DIR`) and CLI toggles (dry-run)
+- Provide `parse_cli_args`, `run_cmd`, and colorized logging helpers
+- Offer thin wrappers for package installs (`_install_pacman_packages`, `_install_aur_packages`) and service management (`_enable_service`)
+- Expose `_display_splash` so both the installer and post-install helpers can re-use the ANSI splash screen
+
+Because every step sources this file via a relative path, shellcheck can follow function calls throughout the tree and canonical paths stay consistent.
 
 ## Installation Steps
 
-Each step is a self-contained script with a single entry point function (`run_step_N_*`). Steps are executed sequentially by the orchestrator.
+### Path Conventions
+
+The installer exposes a few canonical directories so every step references the same sources:
+
+| Variable                             | Description                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `ARCHENEMY_DEFAULTS_DIR`             | Repository defaults (system templates such as pacman, gpg, Plymouth)      |
+| `ARCHENEMY_USER_DOTFILES_DIR`        | User-editable copy of `default/dotfiles` (synced to `~/.config/dotfiles`) |
+| `ARCHENEMY_DEFAULTS_BASE_SYSTEM_DIR` | Step 1 assets (`pacman/`, `gpg/`, `sudoers/`)                             |
+| `ARCHENEMY_DEFAULTS_BOOTLOADER_DIR`  | Step 2 assets (`plymouth/`, `sddm/`, `mkinitcpio/`)                       |
+| `ARCHENEMY_DEFAULTS_DRIVERS_DIR`     | Step 3 driver assets (reserved)                                           |
+| `ARCHENEMY_DEFAULTS_GRAPHICS_DIR`    | Step 4 Hyprland stack defaults (`hypr/`, `waybar/`, `backgrounds/`, etc.) |
+| `ARCHENEMY_DEFAULTS_DOTFILES_DIR`    | Step 5 blueprint (`alacritty/`, `ghostty/`, `zsh/`, etc.)                 |
+| `ARCHENEMY_DEFAULTS_DAEMONS_DIR`     | Step 6 daemon assets (`systemd/user` timers, etc.)                        |
+| `ARCHENEMY_DEFAULTS_CLEANUP_DIR`     | Step 7 cleanup templates (reserved)                                       |
+
+Each step sources `installation/common.sh` so these variables and the shared logging helpers are recognized by shellcheck.
+
+Each step is a self-contained script with a single entry point function (`run_setup_*`). Steps are executed sequentially by the orchestrator and must source `installation/common.sh` so the path variables and logging helpers remain consistent.
+
+Repository defaults are now grouped per step (`default/base_system`, `default/bootloader`, `default/graphics`, `default/dotfiles`, `default/daemons`, etc.). Each step copies only the directories it owns (e.g., Step 4 consumes `default/graphics/{hypr,waybar,mako,...}`, Step 5 reads `default/dotfiles/*`, Step 6 pulls timers from `default/daemons/systemd/user`), so there are no cross-step interdependencies and `default/dotfiles` remains the user blueprint.
+
+> **Online Install Guard**  
+> `install.sh` and `installation/boot.sh` now verify internet connectivity (ping/curl against Arch mirrors) before proceeding, matching the Arch Linux installation guide requirement for online installs and preventing mid-run failures (e.g., the ipinfo curl in the drivers step).
 
 ---
 
-### Step 1: Bootstrap
+### Step 1: System Preparation
 
-**Name**: Bootstrap
-**File**: `installation/steps/1_bootstrap.sh`
-**Entry Point**: `run_step_1_bootstrap()`
+**Name**: System Preparation  
+**File**: `installation/steps/base_system.sh`  
+**Entry Point**: `run_setup_base_system()`
 
-**Description**: Displays welcome splash screen and loads shared helper library.
+**Description**: Configures pacman, system GPG, temporary sudo rules, and developer toolchains so subsequent steps can run unattended.
 
 **Requirements**:
 
-- Repository already cloned at `$ARCHENEMY_PATH` (done by `install.sh`)
-- Internet connection
-- `pacman` package manager available
-- User has `sudo` privileges
+- Base Arch Linux environment with sudo access
+- Repository defaults under `$ARCHENEMY_DEFAULTS_DIR`
+- Internet connectivity for package syncs
 
-**Solution**: Displays ANSI art splash screen, sources `installation/helpers.sh` to make all helper functions available.
+**TODO**: Installs repo-provided pacman configs, updates mirrors, applies system GPG defaults, grants passwordless sudo via installer templates, disables mkinitcpio hooks to avoid repeated rebuilds, installs `base-devel`, and builds the `yay` AUR helper.
 
 **Functions**:
 
-- `_display_splash()`: Displays ANSI art welcome banner
-- `_load_installation_helpers()`: Sources `installation/helpers.sh`
+- `_configure_pacman()`: Installs pacman.conf and mirrorlist from `$ARCHENEMY_DEFAULTS_DIR/pacman` then runs `sudo pacman -Syu`
+- `_configure_system_gpg()`: Deploys the repo `dirmngr.conf` to `/etc/gnupg`
+- `_setup_first_run_privileges()`: Renders `/etc/sudoers.d/archenemy-first-run` using `$ARCHENEMY_INSTALL_FILES_DIR/sudoers/archenemy-first-run`
+- `_configure_sudo_policy()`: Applies persistent sudo policy tweaks (e.g., `passwd_tries=10`)
+- `_disable_mkinitcpio_hooks()`: Temporarily renames mkinitcpio pacman hooks to `.disabled`
+- `_install_base_packages()`: Installs the `base-devel` group
+- `_install_aur_helper()`: Clones, builds, and installs `yay`
 
 ---
 
-### Step 2: Dotfiles Setup
+### Step 2: Bootloader & Display
 
-**Name**: Dotfiles Setup
-**File**: `installation/steps/2_dotfiles.sh`
-**Entry Point**: `run_step_2_setup_dotfiles()`
+**Name**: Bootloader & Display  
+**File**: `installation/steps/bootloader.sh`  
+**Entry Point**: `run_setup_bootloader()`
 
-**Description**: Creates user dotfiles directory and performs one-time copy of default configurations.
+**Description**: Sets up Plymouth, SDDM autologin, Limine, and Snapper, and re-enables mkinitcpio hooks in preparation for driver installs.
 
 **Requirements**:
 
-- Repository cloned at `$ARCHENEMY_PATH`
-- `$ARCHENEMY_PATH/default/` directory exists
+- Step 1 completed
+- Defaults under `$ARCHENEMY_DEFAULTS_DIR/plymouth` and install files for SDDM/mkinitcpio
+- Limine packages available
 
-**Solution**: Creates `~/.config/dotfiles/` and recursively copies all files from `$ARCHENEMY_PATH/default/` into it. This ensures user configurations are detached from installer source.
+**TODO**: Installs Plymouth and copies the repo theme, installs/configures SDDM autologin from templates, configures Limine + Snapper (with retention tuning), deploys mkinitcpio hook snippets, re-enables mkinitcpio hooks, and runs `sudo limine-update`.
 
 **Functions**:
 
-- `_create_dotfiles_directory()`: Creates `~/.config/dotfiles/`
-- `_copy_defaults_to_dotfiles()`: Recursively copies `$ARCHENEMY_PATH/default/.` to `~/.config/dotfiles/`
+- `_configure_plymouth()`: Installs Plymouth, copies the theme to `/usr/share/plymouth/themes/archenemy`, and sets it active
+- `_configure_desktop_display_manager()`: Installs SDDM, renders `/etc/sddm.conf.d/autologin.conf`, enables `sddm.service`
+- `_configure_limine_and_snapper()`: Installs Limine/Snapper, deploys mkinitcpio config fragments, finds the Limine config path (EFI/BIOS), creates Snapper configs for `/` and `/home`, adjusts retention, re-enables mkinitcpio hooks, updates Limine
 
 ---
 
-### Step 3: System Preparation
+### Step 3: Drivers & Hardware
 
-**Name**: System Preparation
-**File**: `installation/steps/3_system_prep.sh`
-**Entry Point**: `run_step_3_prepare_system()`
+**Name**: Drivers & Hardware  
+**File**: `installation/steps/drivers.sh`  
+**Entry Point**: `run_setup_drivers()`
 
-**Description**: Configures base system prerequisites: pacman, GPG, temporary sudo privileges, and AUR helper installation.
+**Description**: Installs networking/peripheral services and GPU drivers for Intel, AMD, and NVIDIA hardware, including hybrid configurations.
 
 **Requirements**:
 
-- Base Arch Linux installation
-- Internet connection
-- User with sudo access
+- mkinitcpio hooks re-enabled from Step 2
+- `lspci` available
+- Internet connectivity
 
-**Solution**: Optimizes pacman configuration, sets up GPG for package signature verification, grants temporary passwordless sudo for installation commands, disables mkinitcpio hooks temporarily, installs `base-devel` and `yay`.
+**TODO**: Installs/starts iwd, tweaks wait-online, sets the wireless regulatory domain, installs Bluetooth + printing stacks, disables USB autosuspend, then probes GPUs via `_has_gpu` helpers to install vendor-specific drivers, adjust modprobe/mkinitcpio configs, and regenerate initramfs.
 
 **Functions**:
 
-- `_configure_pacman()`: Copies archenemy pacman.conf and mirrorlist, runs full system update
-- `_configure_system_gpg()`: Copies GPG dirmngr.conf to `/etc/gnupg/`
-- `_setup_first_run_privileges()`: Creates `/etc/sudoers.d/archenemy-first-run` with passwordless rules
-- `_disable_mkinitcpio_hooks()`: Temporarily renames mkinitcpio hooks to `.disabled`
-- `_install_base_packages()`: Installs `base-devel` group
-- `_install_aur_helper()`: Clones and builds `yay` from AUR
+- `_setup_networking()`: Installs `iwd`, `wireless-regdb`, `nss-mdns`; enables `iwd.service`; masks `systemd-networkd-wait-online`; sets regulatory domain with ipinfo.io
+- `_setup_peripherals()`: Installs `bluez`, `bluez-utils`, `cups`, `avahi`; enables Bluetooth/CUPS services; writes USB autosuspend override
+- `_install_intel_drivers()`: Installs Intel video acceleration packages when `_has_gpu "intel"` succeeds
+- `_install_amd_drivers()`: Installs headers + Mesa stack + AMDGPU/Vulkan packages, enforces `amdgpu` modeset, injects module into mkinitcpio, regenerates initramfs
+- `_install_nvidia_drivers()`: Chooses `nvidia-open-dkms` or `nvidia-dkms`, installs supporting utilities, configures DRM modeset, ensures hybrid modules load first, regenerates initramfs
+
+Supporting helpers: `_get_kernel()`, `_get_kernel_headers()`, `_has_gpu()`, `_has_nvidia_open_gpu()`.
 
 ---
 
-### Step 4: Bootloader & Display
+### Step 4: Graphics Environment
 
-**Name**: Bootloader & Display
-**File**: `installation/steps/4_bootloader.sh`
-**Entry Point**: `run_step_4_configure_bootloader()`
+**Name**: Graphics Environment  
+**File**: `installation/steps/graphics.sh`  
+**Entry Point**: `run_setup_graphics()`
 
-**Description**: Configures bootloader (Limine), boot splash (Plymouth), and display manager (SDDM). Re-enables mkinitcpio hooks before driver installation.
+**Description**: Installs the Hyprland ecosystem (based on the official Hyprland docs and the Omarchy reference), copies the structural configs shipped under `default/graphics/{hypr,waybar,mako,walker,fcitx5,uwsm,backgrounds,fontconfig,chromium,...}` into `~/.config`, syncs the Hyprland keyboard layout with `/etc/vconsole.conf`, and configures the remaining UI assets (fonts, icons, GTK/GNOME defaults, MIME handlers, keyring) so the desktop boots with a complete baseline experience.
 
 **Requirements**:
 
-- System preparation completed
-- Limine bootloader installed (or installable via pacman)
-- Btrfs filesystem (for Snapper integration)
+- Structural configs inside `$ARCHENEMY_DEFAULTS_GRAPHICS_DIR` (hypr, waybar, mako, walker, fcitx5, uwsm, elephant, backgrounds, fontconfig, chromium assets, etc.)
+- `yay` bootstrapped during Step 1 (for Hyprland companions such as hyprsunset, walker, elephant)
+- Access to `/etc/vconsole.conf` for keyboard layout sync
 
-**Solution**: Configures Plymouth theme, sets up SDDM autologin, configures Limine with Snapper for snapshot boot entries, defines mkinitcpio hooks with btrfs-overlayfs support, re-enables mkinitcpio hooks.
+**TODO**:
 
-**Functions**:
-
-- `_configure_plymouth()`: Installs Plymouth, copies archenemy theme, sets as default
-- `_configure_sddm()`: Installs SDDM, creates autologin configuration for current user with Hyprland session, enables sddm.service
-- `_configure_limine_and_snapper()`: Installs Limine and Snapper, creates mkinitcpio hooks configuration, detects Limine config path (EFI vs BIOS), configures Snapper for root and home, tweaks Snapper limits, re-enables mkinitcpio hooks, updates Limine
+- `_install_hyprland_stack()`: Installs Hyprland, hyprlock, hypridle, screenshot helpers, and deploys `default/graphics/hypr`
+- `_install_session_management()`: Installs `uwsm` and copies `default/graphics/uwsm`
+- `_install_waybar_stack()`: Installs Waybar and copies `default/graphics/waybar`
+- `_install_notifications_stack()`: Installs mako + SwayOSD (libnotify, brightnessctl) and copies `default/graphics/{mako,swayosd}`
+- `_install_input_method_configs()`: Installs fcitx5 packages and copies `default/graphics/fcitx5` + `default/graphics/environment.d`
+- `_install_elephant_suite()`: Installs walker/elephant AUR helpers and copies `default/graphics/{elephant,walker}`
+- `_install_visual_assets()`: Copies `default/graphics/{backgrounds,fontconfig}`, re-linking the default wallpaper
+- `_configure_browser_defaults()`: Installs Chromium and copies `default/graphics/chromium*` plus `default/graphics/icons.theme`
+- `_sync_hypr_keyboard_layout()`: Mirrors `/etc/vconsole.conf` (`XKBLAYOUT`) into `~/.config/hypr/hyprland.conf`
+- `_install_fonts()` / `_install_icons()`: Installs bundled fonts/icons (FiraCode, Noto, repo icons)
+- `_configure_gtk_gnome_defaults()`: Installs GTK themes plus GNOME fallback apps (nautilus, gnome-text-editor) and applies gsettings
+- `_configure_mimetypes()`: Sets default handlers for common MIME types
+- `_configure_default_keyring()`: Installs `gnome-keyring`/`polkit-gnome` and provisions an unlocked keyring
 
 ---
 
-### Step 5: Drivers & Hardware
+### Step 5: Dotfiles
 
-**Name**: Drivers & Hardware
-**File**: `installation/steps/5_drivers.sh`
-**Entry Point**: `run_step_5_drivers_and_hardware()`
+**Name**: Dotfiles  
+**File**: `installation/steps/dotfiles.sh`  
+**Entry Point**: `run_setup_dotfiles()`
 
-**Description**: Detects and installs hardware drivers: networking, peripherals, and GPU drivers (Intel, AMD, NVIDIA).
+**Description**: Refreshes the detached dotfiles blueprint under `~/.config/dotfiles`, installs the shell/terminal packages required by that blueprint, copies the curated files into the live `~/.config`, wires optional TUIs/webapps through reusable helpers, and applies the remaining personalization (Git identity).
 
 **Requirements**:
 
-- mkinitcpio hooks re-enabled (from Step 4)
-- Internet connection
-- `lspci` available for hardware detection
+- Graphics stack installed (Step 4)
+- Defaults under `$ARCHENEMY_DEFAULTS_DOTFILES_DIR`
+- Optional: `ARCHENEMY_USER_NAME`, `ARCHENEMY_USER_EMAIL`
 
-**Solution**: Configures iwd for wireless networking, disables networkd-wait-online to prevent boot delays, sets wireless regulatory domain, enables Bluetooth and CUPS services, disables USB autosuspend, detects GPUs via `lspci` and installs appropriate drivers with kernel modules and initramfs regeneration.
+**TODO**:
 
-**Functions**:
-
-- `_setup_networking()`: Installs iwd, wireless-regdb, nss-mdns; enables iwd.service; masks networkd-wait-online; sets wireless regulatory domain via ipinfo.io
-- `_setup_peripherals()`: Installs bluez, cups, avahi; enables bluetooth, cups, avahi-daemon, cups-browsed services; disables USB autosuspend via modprobe.d
-- `_install_intel_drivers()`: Checks for Intel GPU via `_has_gpu "intel"`, installs intel-media-driver and libva-intel-driver
-- `_install_amd_drivers()`: Checks for AMD GPU, gets kernel headers via `_get_kernel_headers()`, installs Mesa stack, AMDGPU drivers, Vulkan, configures amdgpu modeset, adds amdgpu to mkinitcpio MODULES, regenerates initramfs
-- `_install_nvidia_drivers()`: Checks for NVIDIA GPU, selects nvidia-open-dkms or nvidia-dkms via `_has_nvidia_open_gpu()`, installs drivers and utilities, configures nvidia_drm modeset, handles hybrid graphics (Intel/AMD iGPU + NVIDIA dGPU), adds modules to mkinitcpio in correct order, regenerates initramfs
+- `_prepare_dotfiles_blueprint()`: Copies the curated directories/files (`alacritty`, `btop`, `git`, `lazygit`, `ghostty`, `kitty`, `bashrc`, `neovim.lua`, `starship.toml`, etc.) from `default/dotfiles` into `~/.config/dotfiles` without using broad globs
+- `_install_shell_packages()`: Installs zsh, completion bundles, kitty, ghostty, and `oh-my-zsh-git`
+- `_copy_dotfiles_to_config()`: Synchronizes the dotfiles blueprint into `~/.config`, replacing only the curated targets and reloading user systemd if available
+- `_configure_zsh()` / `_configure_git()`: Applies the zsh config shipped under `default/dotfiles/zsh{,rc}` and sets Git identity from `ARCHENEMY_USER_NAME/EMAIL`
+- `_create_desktop_entry()` / `_create_webapp_entry()`: Helper functions for future TUIs/webapps
+- `_install_and_configure_tuis()` / `_install_and_configure_webapps()`: Blueprint hooks for registering TUIs/webapps alongside the dotfiles
 
 ---
 
-### Step 6: Desktop Software
+### Step 6: Services Configuration
 
-**Name**: Desktop Software
-**File**: `installation/steps/6_software.sh`
-**Entry Point**: `run_step_6_install_software()`
+**Name**: Services Configuration  
+**File**: `installation/steps/daemons.sh`  
+**Entry Point**: `run_setup_daemons()`
 
-**Description**: Installs user-facing software: fonts, icons, core applications, TUIs, webapps, and system services like Docker.
+**Description**: Finalizes core daemons: UFW firewall, systemd-resolved DNS, power profiles, and user-level monitors that must exist before the desktop session starts.
 
 **Requirements**:
 
-- `yay` AUR helper installed (from Step 3)
-- Repository cloned with assets
+- Packages (`ufw`, `ufw-docker`, `power-profiles-daemon`) installable
+- sudo privileges
 
-**Solution**: Installs fonts and icons from repository and pacman, configures Zsh as default shell with Oh My Zsh, enables Docker service and adds user to docker group, installs and creates desktop entries for TUIs (lazydocker, lazyjournal) and webapps (GitHub, Discord), generates first-run desktop helper script.
+**TODO**: Installs/configures UFW (with Docker allowances), links `/etc/resolv.conf` to the stub resolver, sets balanced/performance profiles via `powerprofilesctl`, deploys the bundled battery monitor systemd units into the user daemon tree, and applies structural system service tweaks such as faster shutdown timeouts.
 
 **Functions**:
 
-- `_install_assets()`: Installs font packages, copies custom fonts to `~/.local/share/fonts`, copies icons to `~/.local/share/icons`, runs `fc-cache`
-- `_configure_zsh()`: Installs zsh and oh-my-zsh-git, copies zsh config files from `$ARCHENEMY_PATH/default/zsh/`, copies .zshrc, changes user shell to zsh
-- `_configure_system_services()`: Installs Docker, enables docker.service, adds user to docker group, configures Docker daemon with log rotation, runs updatedb, configures faster shutdown timeout
-- `_install_and_configure_tuis()`: Installs TUI packages from AUR, creates desktop entries via `_create_desktop_entry()`
-- `_install_and_configure_webapps()`: Installs Chromium, creates webapp desktop entries via `_create_webapp_entry()`
-- `_create_first_run_runner()`: Generates `$ARCHENEMY_PATH/bin/archenemy-first-run` script with post-boot tasks (power config, firewall, DNS, theme, notifications)
+- `_configure_firewall()`: Installs UFW + ufw-docker, sets policies, opens installer-required ports, enables firewall service, reloads rules
+- `_configure_dns_resolver()`: Symlinks `/etc/resolv.conf` to `/run/systemd/resolve/stub-resolv.conf`
+- `_configure_power_management()`: Installs `power-profiles-daemon`, sets the profile based on battery detection, and calls `_deploy_battery_monitor_timer()`
+- `_deploy_battery_monitor_timer()`: Copies `default/daemons/systemd/user/battery-monitor.{service,timer}` into `~/.config/systemd/user` and enables the timer when a user systemd session is active
+- `_configure_system_services()`: Runs supplementary service tweaks (e.g., updatedb, systemd shutdown timeout)
 
 ---
 
-### Step 7: User Configuration
+### Step 7: Cleanup
 
-**Name**: User Configuration
-**File**: `installation/steps/7_user_config.sh`
-**Entry Point**: `run_step_7_apply_user_config()`
+**Name**: Cleanup  
+**File**: `installation/steps/cleanup.sh`  
+**Entry Point**: `run_cleanup()`
 
-**Description**: Applies user-specific configurations: dotfiles, GTK themes, application themes, Git settings, system tweaks, MIME types, keyring setup.
+**Description**: Restores pacman defaults and removes installer-only sudo permissions.
 
 **Requirements**:
 
-- Dotfiles copied to `~/.config/dotfiles/` (from Step 2)
-- Desktop packages installed (from Step 6)
+- Steps 1–6 completed
 
-**Solution**: Copies configuration files from dotfiles directory to active config locations, applies GTK and icon themes via gsettings, configures application-specific themes, applies Git user settings from environment variables, applies system tweaks (sudo retries, keyboard layout detection), sets MIME types for default applications, creates unlocked default keyring, schedules first-run tasks.
+**TODO**: Installs pacman.conf and mirrorlist from repo defaults and deletes `/etc/sudoers.d/archenemy-first-run`.
 
 **Functions**:
 
-- `_apply_base_config()`: Copies core configs (hypr, alacritty, bashrc) from `~/.config/dotfiles/` to `~/.config/`
-- `_create_theme_directory_structure()`: Creates `~/.config/archenemy/current/` with theme_path and background_path pointers
-- `_apply_gtk_theme()`: Installs gnome-themes-extra and yaru-icon-theme, sets GTK theme to Adwaita-dark and icon theme to Yaru-blue via gsettings, updates icon cache
-- `_apply_app_specific_themes()`: Copies theme files for btop and mako from dotfiles to active config
-- `_apply_user_preferences()`: Configures Git user.name and user.email from `$ARCHENEMY_USER_NAME` and `$ARCHENEMY_USER_EMAIL`
-- `_apply_system_tweaks()`: Sets sudo passwd_tries to 10, detects keyboard layout from vconsole.conf and applies to Hyprland config
-- `_apply_mimetypes()`: Updates desktop database, sets default applications for images (imv), PDFs (evince), web browser (chromium), videos (mpv)
-- `_setup_default_keyring()`: Creates Default_keyring.keyring in `~/.local/share/keyrings/` with unlocked settings
-- `_schedule_first_run_tasks()`: Creates `~/.local/state/archenemy/first-run.mode` sentinel file
+- `_run_pacman_cleanup()`: Copies pacman defaults from `$ARCHENEMY_DEFAULTS_DIR/pacman` to `/etc/pacman*`
+- `_cleanup_installer_sudo_rules()`: Removes the temporary sudoers file
 
 ---
 
-### Step 8: Services Configuration
+### Step 8: Reboot
 
-**Name**: Services Configuration
-**File**: `installation/steps/8_services.sh`
-**Entry Point**: `run_step_8_configure_services()`
+**Name**: Reboot  
+**File**: `installation/steps/reboot.sh`  
+**Entry Point**: `run_reboot()`
 
-**Description**: Configures system services: firewall (UFW), DNS resolver (systemd-resolved), power management.
-
-**Requirements**:
-
-- All packages installed
-- User has sudo access
-
-**Solution**: Installs and configures UFW firewall with default deny policy and Docker-specific rules, creates systemd-resolved symlink for `/etc/resolv.conf`, detects battery and sets appropriate power profile.
-
-**Functions**:
-
-- `_configure_firewall()`: Installs ufw and ufw-docker, sets default policies, allows specific ports (53317 UDP/TCP), allows Docker DNS traffic, enables ufw.service, installs ufw-docker integration, reloads firewall
-- `_configure_dns_resolver()`: Creates symlink `/etc/resolv.conf` -> `/run/systemd/resolve/stub-resolv.conf`
-- `_configure_power_management()`: Installs power-profiles-daemon, detects battery presence via `/sys/class/power_supply/BAT*`, sets profile to balanced (laptop) or performance (desktop), enables omarchy-battery-monitor.timer if battery present
-
----
-
-### Step 9: Cleanup
-
-**Name**: Cleanup
-**File**: `installation/steps/9_cleanup.sh`
-**Entry Point**: `run_step_9_cleanup()`
-
-**Description**: Cleans up temporary installer artifacts and restores default system configurations.
+**Description**: Displays the completion message, emits desktop notifications, and provides a passwordless reboot shortcut for the final restart.
 
 **Requirements**:
 
-- Installation completed through Step 8
+- All previous steps complete
 
-**Solution**: Restores original pacman configuration, removes temporary installer sudoers rules.
-
-**Functions**:
-
-- `_run_pacman_cleanup()`: Copies default pacman.conf and mirrorlist from `$ARCHENEMY_PATH/default/pacman/` to `/etc/pacman.conf` and `/etc/pacman.d/mirrorlist`
-- `_cleanup_installer_sudo_rules()`: Removes `/etc/sudoers.d/archenemy-first-run`
-
----
-
-### Step 10: Reboot
-
-**Name**: Reboot
-**File**: `installation/steps/10_reboot.sh`
-**Entry Point**: `run_step_10_reboot()`
-
-**Description**: Displays completion message, sends desktop notifications, and prompts user to reboot.
-
-**Requirements**:
-
-- All installation steps completed
-
-**Solution**: Grants temporary passwordless reboot permission, sends welcome notifications, displays archenemy logo, prompts for reboot.
+**TODO**: Creates a temporary sudoers rule that permits `reboot` without a password, installs `libnotify`, sends reminders (update system, learn keybindings, set up Wi-Fi if offline), prints the ASCII logo, and prompts the user to reboot (calling `sudo reboot` if confirmed).
 
 **Functions**:
 
-- `_allow_passwordless_reboot()`: Creates `/etc/sudoers.d/99-archenemy-installer-reboot` with passwordless reboot permission
-- `_display_finished_message()`: Installs libnotify, sends notify-send messages (update system, keybindings, wifi setup if offline), displays logo from `$ARCHENEMY_PATH/logo.txt`, prompts user to reboot, executes `sudo reboot` if confirmed
+- `_allow_passwordless_reboot()`: Writes `/etc/sudoers.d/99-archenemy-installer-reboot`
+- `_display_finished_message()`: Installs `libnotify`, sends notifications, displays the logo, handles the reboot prompt
 
 ## LLM Implementation Guidelines
 
@@ -466,7 +448,7 @@ Mandatory final validation:
 1. **Linter Validation**
 
    ```bash
-   shellcheck -x install.sh installation/boot.sh installation/steps/*.sh installation/helpers.sh
+   shellcheck -x install.sh installation/boot.sh installation/common.sh installation/steps/*.sh
    ```
 
 2. **Reference Validation**
@@ -515,7 +497,7 @@ Any structural change must be documented:
 - Global exports: `ARCHENEMY_*` (UPPER_CASE)
 - Local variables: `lowercase_with_underscores`
 - Private functions: `_function_name` (underscore prefix)
-- Public entry points: `run_step_N_descriptive_name`
+- Public entry points: `run_setup_descriptive_name`
 - Constants: `READONLY_VALUE` (UPPER_CASE)
 
 **Error Handling Requirements**:
@@ -569,122 +551,3 @@ fi
 - Handle word splitting properly
 - Use `command -v` not `which`
 - Declare functions before use
-
-### Example: Complete Modification Workflow
-
-This example demonstrates adding a new validation function to Step 3 (System Preparation).
-
-**Scenario**: Add a function to verify available disk space before installation.
-
-**Phase 1: Investigation**
-
-```bash
-# Read current implementation
-cat installation/steps/3_system_prep.sh
-
-# Identify dependencies
-grep -r "_install_base_packages" installation/
-
-# Check README
-grep -A 10 "Step 3: System Preparation" README.md
-```
-
-**Phase 2: Analysis**
-
-- Current implementation lacks disk space validation
-- No guard against insufficient space
-- Should run before package installation
-- Requires `df` command (available in coreutils)
-
-**Phase 3: Design**
-
-```
-Function name: _verify_disk_space
-Parameters: None (uses / partition)
-Minimum required: 10GB
-Error handling: Exit if insufficient
-Location: Before _install_base_packages call
-```
-
-**Phase 4: Implementation**
-
-Step 1 - Update README.md:
-
-```markdown
-### Step 3: System Preparation
-
-**Functions**:
-
-- `_configure_pacman()`: ...
-- `_configure_system_gpg()`: ...
-- `_verify_disk_space()`: Checks available disk space on root partition, requires minimum 10GB free
-- `_setup_first_run_privileges()`: ...
-```
-
-Step 2 - Update 3_system_prep.sh:
-
-```bash
-#
-# Verifies that sufficient disk space is available for installation.
-# Requires minimum 10GB free on root partition.
-#
-# Returns:
-#   0 if sufficient space available
-#   1 if insufficient space
-#
-_verify_disk_space() {
-  log_info "Checking available disk space..."
-  local required_gb=10
-  local available_gb
-
-  # Get available space in GB
-  available_gb=$(df / | awk 'NR==2 {print int($4/1024/1024)}')
-
-  if [[ $available_gb -lt $required_gb ]]; then
-    log_error "Insufficient disk space. Required: ${required_gb}GB, Available: ${available_gb}GB"
-    return 1
-  fi
-
-  log_info "Disk space check passed: ${available_gb}GB available"
-  return 0
-}
-
-run_step_3_prepare_system() {
-  log_info "Starting Step 3: System Preparation..."
-
-  # --- Sub-step 3.1: Verify disk space ---
-  _verify_disk_space
-
-  # --- Sub-step 3.2: Configure pacman and system repositories ---
-  _configure_pacman
-
-  # ... rest of function
-}
-```
-
-Step 3 - Update dependent files:
-
-- None in this case (new function)
-
-Step 4 - Verify consistency:
-
-- README lists new function
-- Function has complete documentation
-- Uses local variables
-- Has error handling
-- Follows naming conventions
-
-**Phase 5: Validation**
-
-```bash
-shellcheck -x installation/steps/3_system_prep.sh
-grep "_verify_disk_space" README.md
-```
-
-This workflow ensures:
-
-- Documentation updated before code
-- Complete inline documentation
-- Proper error handling
-- Naming conventions followed
-- All changes validated

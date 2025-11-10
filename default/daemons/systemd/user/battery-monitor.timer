@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically check battery level
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=default.target
