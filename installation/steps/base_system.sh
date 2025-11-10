@@ -28,7 +28,32 @@ _configure_pacman() {
 
   run_cmd sudo install -m 644 "$pacman_conf_path" /etc/pacman.conf
   run_cmd sudo install -m 644 "$pacman_mirrorlist_path" /etc/pacman.d/mirrorlist
-  run_cmd sudo pacman -Syu --noconfirm
+
+  log_info "Installing reflector for dynamic mirror management..."
+  run_cmd sudo pacman -Syy --noconfirm --needed --disable-download-timeout reflector
+
+  _refresh_pacman_mirrorlist
+
+  log_info "Syncing system packages with refreshed mirrors..."
+  run_cmd sudo pacman -Syyu --noconfirm --disable-download-timeout
+}
+
+_refresh_pacman_mirrorlist() {
+  log_info "Refreshing pacman mirrorlist with reflector..."
+  local save_path="/etc/pacman.d/mirrorlist"
+  local reflector_cmd=(
+    sudo reflector
+    --protocol https
+    --latest 20
+    --sort rate
+    --save "$save_path"
+  )
+
+  if run_cmd "${reflector_cmd[@]}"; then
+    log_success "Mirrorlist updated with fastest HTTPS mirrors."
+  else
+    log_warn "Reflector failed to refresh mirrors; continuing with bundled list."
+  fi
 }
 
 ################################################################################

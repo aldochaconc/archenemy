@@ -53,11 +53,15 @@ Single shared shell library imported by `boot.sh` and every step script.
 **Responsibilities**:
 
 - Export canonical directories (`ARCHENEMY_DEFAULTS_DIR`, `ARCHENEMY_USER_DOTFILES_DIR`, `ARCHENEMY_INSTALL_FILES_DIR`) and CLI toggles (dry-run)
-- Provide `parse_cli_args`, `run_cmd`, and colorized logging helpers
+- Provide `parse_cli_args`, `run_cmd`, and colorized logging helpers that stream to stdout and append to `ARCHENEMY_INSTALL_LOG_FILE` (defaults to `/var/log/archenemy-install.log`)
 - Offer thin wrappers for package installs (`_install_pacman_packages`, `_install_aur_packages`) and service management (`_enable_service`)
 - Expose `_display_splash` so both the installer and post-install helpers can re-use the ANSI splash screen
 
 Because every step sources this file via a relative path, shellcheck can follow function calls throughout the tree and canonical paths stay consistent.
+
+#### Installer Logging
+
+`install.sh`/`installation/boot.sh` ensure `/var/log/archenemy-install.log` exists (respecting `ARCHENEMY_INSTALL_LOG_FILE`) and is writable by the invoking user before any steps run. Every `log_info/log_success/log_error` message is printed to the console and appended to that file with timestamps, so failed installs can be debugged afterwards with `tail -f /var/log/archenemy-install.log` or by collecting the file for support.
 
 ## Installation Steps
 
@@ -94,7 +98,7 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 **File**: `installation/steps/base_system.sh`  
 **Entry Point**: `run_setup_base_system()`
 
-**Description**: Configures pacman, system GPG, temporary sudo rules, and developer toolchains so subsequent steps can run unattended.
+**Description**: Configures pacman (including dynamic mirror ranking via `reflector` and resilient pacman flags), system GPG, temporary sudo rules, and developer toolchains so subsequent steps can run unattended.
 
 **Requirements**:
 
@@ -102,11 +106,12 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 - Repository defaults under `$ARCHENEMY_DEFAULTS_DIR`
 - Internet connectivity for package syncs
 
-**TODO**: Installs repo-provided pacman configs, updates mirrors, applies system GPG defaults, grants passwordless sudo via installer templates, disables mkinitcpio hooks to avoid repeated rebuilds, installs `base-devel`, and builds the `yay` AUR helper.
+**TODO**: Installs repo-provided pacman configs, installs `reflector`, ranks HTTPS mirrors, applies system GPG defaults, grants passwordless sudo via installer templates, disables mkinitcpio hooks to avoid repeated rebuilds, installs `base-devel`, and builds the `yay` AUR helper.
 
 **Functions**:
 
-- `_configure_pacman()`: Installs pacman.conf and mirrorlist from `$ARCHENEMY_DEFAULTS_DIR/pacman` then runs `sudo pacman -Syu`
+- `_configure_pacman()`: Installs pacman.conf and mirrorlist from `$ARCHENEMY_DEFAULTS_DIR/pacman`, installs `reflector`, calls `_refresh_pacman_mirrorlist`, then runs `sudo pacman -Syyu --disable-download-timeout`
+- `_refresh_pacman_mirrorlist()`: Uses `reflector` to select the fastest HTTPS mirrors, falling back to the bundled mirrorlist if ranking fails
 - `_configure_system_gpg()`: Deploys the repo `dirmngr.conf` to `/etc/gnupg`
 - `_setup_first_run_privileges()`: Renders `/etc/sudoers.d/archenemy-first-run` using `$ARCHENEMY_INSTALL_FILES_DIR/sudoers/archenemy-first-run`
 - `_configure_sudo_policy()`: Applies persistent sudo policy tweaks (e.g., `passwd_tries=10`)
@@ -289,6 +294,23 @@ Supporting helpers: `_get_kernel()`, `_get_kernel_headers()`, `_has_gpu()`, `_ha
 
 - `_allow_passwordless_reboot()`: Writes `/etc/sudoers.d/99-archenemy-installer-reboot`
 - `_display_finished_message()`: Installs `libnotify`, sends notifications, displays the logo, handles the reboot prompt
+
+## Local VM Harness (`archenemy-vm/Makefile`)
+
+The repository ships a thin QEMU harness for rapid iteration. All targets run from `archenemy-vm/Makefile`; the most common flow is:
+
+- `make iso` → ranks mirrors and downloads the latest Arch ISO (skips download if `archlinux.iso` already exists)
+- `make image` → creates/overwrites `archenemy-vm.qcow2` and seeds a writable OVMF vars file
+- `make run` → boots the ISO (`-boot d -cdrom ...`) for clean installs
+- `make run-installed` → boots directly from the QCOW2 disk (`-boot c`) after an install completes
+
+Networking defaults to QEMU’s user-mode NAT for portability. To attach the guest to a host tap/bridge, set:
+
+```bash
+NETWORK_MODE=tap NETWORK_TAP_IF=tap0 NETWORK_TAP_UP=/etc/qemu-ifup NETWORK_TAP_DOWN=/etc/qemu-ifdown make run-installed
+```
+
+`QEMU_COMMON_ARGS` is shared by both run targets, so adjusting RAM/CPUs/devices only requires editing the variable once near the top of the Makefile.
 
 ## LLM Implementation Guidelines
 

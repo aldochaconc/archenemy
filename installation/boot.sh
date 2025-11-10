@@ -54,6 +54,23 @@ export ARCHENEMY_USER_NAME="${ARCHENEMY_USER_NAME:-}"
 export ARCHENEMY_USER_EMAIL="${ARCHENEMY_USER_EMAIL:-}"
 
 # shellcheck source=./common.sh
+# Ensure log file exists and is writable for the current user.
+ensure_log_file() {
+  local log_file="$1"
+  local log_dir
+  log_dir="$(dirname "$log_file")"
+
+  sudo install -d -m 755 "$log_dir"
+  if [[ ! -f "$log_file" ]]; then
+    sudo touch "$log_file"
+  fi
+  sudo chown "$USER":"$USER" "$log_file"
+  sudo chmod 644 "$log_file"
+}
+
+ensure_log_file "$ARCHENEMY_INSTALL_LOG_FILE"
+
+# shellcheck source=./common.sh
 source "./common.sh"
 
 ################################################################################

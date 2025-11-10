@@ -72,15 +72,25 @@ __archenemy__print_log() {
   local level="$1"
   local message="$2"
   local color_code
+  local timestamp log_line
 
   case "$level" in
   INFO) color_code="\e[34m" ;;
   SUCCESS) color_code="\e[32m" ;;
+  WARN) color_code="\e[33m" ;;
   ERROR) color_code="\e[31m" ;;
   *) color_code="\e[0m" ;;
   esac
 
   printf "%b[%s] %s\e[0m\n" "$color_code" "$level" "$message"
+
+  if [[ -n "${ARCHENEMY_INSTALL_LOG_FILE:-}" ]]; then
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    log_line="[$timestamp] [$level] $message"
+    {
+      printf "%s\n" "$log_line"
+    } >>"$ARCHENEMY_INSTALL_LOG_FILE" 2>/dev/null || true
+  fi
 }
 
 log_info() {
@@ -89,6 +99,10 @@ log_info() {
 
 log_success() {
   __archenemy__print_log "SUCCESS" "$1"
+}
+
+log_warn() {
+  __archenemy__print_log "WARN" "$1"
 }
 
 log_error() {
