@@ -9,7 +9,7 @@ VM_DIR         := $(CURDIR)
 ISO_NAME       := archlinux.iso
 ISO_FILE       := $(VM_DIR)/$(ISO_NAME)
 DISK_FILE      := $(VM_DIR)/$(VM_NAME).qcow2
-DISK_SIZE      := 30G
+DISK_SIZE      := 40G
 RAM_MB         := 4096
 CPUS           := 4
 GPU_DEVICE     := virtio-vga
@@ -45,6 +45,22 @@ SCRIPTS_DIR    := $(VM_DIR)/scripts
 MIRRORLIST_TMP := /tmp/mirrorlist
 MIRROR_CMD     = awk '/Server = / {gsub("^Server = ", "", $$0); sub("/\\$$repo.*", "", $$0); print $$0; exit}' /etc/pacman.d/mirrorlist 2>/dev/null
 MIRROR_URL     := $(shell $(MIRROR_CMD))
+QEMU_COMMON_ARGS = \
+ -enable-kvm \
+ -name $(VM_NAME) \
+ -m $(RAM_MB) \
+ -smp $(CPUS) \
+ -drive file=$(DISK_FILE),format=qcow2 \
+ -device $(GPU_DEVICE) \
+ -device $(AUDIO_DEVICE) \
+ -device $(AUDIO_CODEC),audiodev=snd0 \
+ -audiodev pa,id=snd0,out.frequency=44100,out.channels=2 \
+ -display gtk,gl=on \
+ -machine type=q35,accel=kvm \
+ -cpu host \
+ -drive if=pflash,format=raw,readonly=on,file=$(UEFI_CODE) \
+ -drive if=pflash,format=raw,file=$(UEFI_VARS) \
+ -net nic,model=virtio -net user,hostfwd=tcp::$(SPICE_PORT)-:22
 
 BLUE   := $(shell printf "\033[1;34m")
 GREEN  := $(shell printf "\033[1;32m")
@@ -57,7 +73,7 @@ msg_done = @bash -c 'printf "$(GREEN)[DONE]$(RESET) %s\n" "$(1)"'
 msg_warn = @bash -c 'printf "$(YELLOW)[WARN]$(RESET) %s\n" "$(1)"'
 msg_err  = @bash -c 'printf "$(RED)[ERROR]$(RESET) %s\n" "$(1)"'
 
-.PHONY: all deps mirror iso image prepare run reset inspect bootstrap clean help
+.PHONY: all deps mirror iso image prepare run run-installed reset inspect bootstrap clean help
 
 all: help
 
@@ -123,25 +139,36 @@ run:
 		echo "UEFI vars file is missing. Run 'make image' first."; \
 		exit 1; \
 	fi
-	qemu-system-x86_64 \
-	  -enable-kvm \
-	  -name $(VM_NAME) \
-	  -m $(RAM_MB) \
-	  -smp $(CPUS) \
+	@if [ ! -f "$(ISO_FILE)" ]; then \
+		echo "Arch ISO missing at $(ISO_FILE). Run 'make iso' first."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(DISK_FILE)" ]; then \
+		echo "Disk image missing at $(DISK_FILE). Run 'make image' first."; \
+		exit 1; \
+	fi
+	qemu-system-x86_64 $(QEMU_COMMON_ARGS) \
 	  -boot d \
-	  -cdrom $(ISO_FILE) \
-	  -drive file=$(DISK_FILE),format=qcow2 \
-		  -device $(GPU_DEVICE) \
-		  -device $(AUDIO_DEVICE) \
-		  -device $(AUDIO_CODEC),audiodev=snd0 \
-		  -audiodev pa,id=snd0,out.frequency=44100,out.channels=2 \
-	  -display gtk,gl=on \
-	  -machine type=q35,accel=kvm \
-	  -cpu host \
-	  -drive if=pflash,format=raw,readonly=on,file=$(UEFI_CODE) \
-	  -drive if=pflash,format=raw,file=$(UEFI_VARS) \
-	  -net nic,model=virtio -net user,hostfwd=tcp::$(SPICE_PORT)-:22
+	  -cdrom $(ISO_FILE)
 	$(call msg_done,VM launched successfully.)
+
+run-installed:
+	$(call msg_info,Booting installed system from disk...)
+	@if [ -z "$(UEFI_CODE)" ]; then \
+		echo "Missing OVMF_CODE firmware (package edk2-ovmf)."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(UEFI_VARS)" ]; then \
+		echo "UEFI vars file is missing. Run 'make image' first."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(DISK_FILE)" ]; then \
+		echo "Disk image missing at $(DISK_FILE). Run 'make image' first."; \
+		exit 1; \
+	fi
+	qemu-system-x86_64 $(QEMU_COMMON_ARGS) \
+	  -boot c
+	$(call msg_done,Installed system booted successfully.)
 
 reset:
 	$(call msg_info,Resetting VM environment...)
@@ -172,7 +199,8 @@ help:
 	@echo "  $(BLUE)iso$(RESET)        - Download Arch Linux ISO using top mirror"
 	@echo "  $(BLUE)image$(RESET)      - Create QCOW2 disk"
 	@echo "  $(BLUE)prepare$(RESET)    - Install deps, rank mirror, download ISO, and create disk"
-	@echo "  $(BLUE)run$(RESET)        - Launch VM"
+	@echo "  $(BLUE)run$(RESET)        - Launch VM from installer ISO"
+	@echo "  $(BLUE)run-installed$(RESET) - Boot the installed system from disk"
 	@echo "  $(BLUE)reset$(RESET)      - Reset VM environment"
 	@echo "  $(BLUE)inspect$(RESET)    - Inspect VM disk and metadata"
 	@echo "  $(BLUE)bootstrap$(RESET)  - Run installer inside VM"
