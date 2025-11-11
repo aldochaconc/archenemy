@@ -1,7 +1,9 @@
 # ==============================================================
 #  Archenemy Virtual Machine Environment
 # ==============================================================
-#  Enhanced Makefile CLI with dynamic mirror selection using rankmirrors
+#  Enhanced Makefile CLI with dynamic mirror selection using rankmirrors.
+#  Includes an optional host-side pacman cache (USE_CACHE=1) exposed to the VM
+#  via virtio-9p so we can mimic the USB cache workflow during local testing.
 # ==============================================================
 
 VM_NAME        := archenemy-vm
@@ -12,6 +14,10 @@ DISK_FILE      := $(VM_DIR)/$(VM_NAME).qcow2
 DISK_SIZE      := 40G
 RAM_MB         := 4096
 CPUS           := 4
+USE_CACHE     ?= 0
+CACHE_ROOT     := $(VM_DIR)/vm-cache
+PACMAN_CACHE_DIR := $(CACHE_ROOT)/pacman
+CACHE_MOUNT_TAG := archenemy-cache
 
 # --- Device / Driver configuration ---
 GPU_DEVICE     := virtio-vga
@@ -75,6 +81,13 @@ QEMU_COMMON_ARGS = \
  -drive if=pflash,format=raw,readonly=on,file=$(UEFI_CODE) \
  -drive if=pflash,format=raw,file=$(UEFI_VARS)
 
+ifeq ($(USE_CACHE),1)
+QEMU_CACHE_ARGS = \
+ -virtfs local,path=$(PACMAN_CACHE_DIR),mount_tag=$(CACHE_MOUNT_TAG),security_model=passthrough,id=cache0
+else
+QEMU_CACHE_ARGS =
+endif
+
 ifeq ($(NETWORK_MODE),tap)
 QEMU_NET_ARGS = \
  -netdev tap,id=net0,ifname=$(NETWORK_TAP_IF),script=$(NETWORK_TAP_UP),downscript=$(NETWORK_TAP_DOWN) \
@@ -100,7 +113,7 @@ msg_done = @bash -c 'printf "$(GREEN)[DONE]$(RESET) %s\n" "$(1)"'
 msg_warn = @bash -c 'printf "$(YELLOW)[WARN]$(RESET) %s\n" "$(1)"'
 msg_err  = @bash -c 'printf "$(RED)[ERROR]$(RESET) %s\n" "$(1)"'
 
-.PHONY: all deps mirror iso image prepare run run-installed logs ssh clean help
+.PHONY: all deps mirror iso image prepare run run-installed logs ssh clean cache cache-clean help
 
 all: help
 
@@ -154,8 +167,26 @@ prepare: deps iso image
 	$(call msg_done,Environment ready for VM launch.)
 
 # --------------------------------------------------------------
+# Shared pacman cache helpers (QEMU-only, optional)
+# --------------------------------------------------------------
+cache:
+	$(call msg_info,Preparing shared pacman cache at $(PACMAN_CACHE_DIR)...)
+	mkdir -p $(PACMAN_CACHE_DIR)
+	$(call msg_done,Pacman cache directory ready.)
+
+cache-clean:
+	$(call msg_warn,Removing shared pacman cache...)
+	rm -rf $(CACHE_ROOT)
+	$(call msg_done,Pacman cache removed.)
+
+# --------------------------------------------------------------
 # Run VM
 # --------------------------------------------------------------
+ifeq ($(USE_CACHE),1)
+run: cache
+run-installed: cache
+endif
+
 run:
 	$(call msg_info,Launching $(VM_NAME) with QEMU...)
 	@if [ -z "$(UEFI_CODE)" ]; then \
@@ -174,7 +205,7 @@ run:
 		echo "Disk image missing at $(DISK_FILE). Run 'make image' first."; \
 		exit 1; \
 	fi
-	qemu-system-x86_64 $(QEMU_COMMON_ARGS) $(QEMU_NET_ARGS) \
+	qemu-system-x86_64 $(QEMU_COMMON_ARGS) $(QEMU_NET_ARGS) $(QEMU_CACHE_ARGS) \
 	  -boot d \
 	  -cdrom $(ISO_FILE)
 	$(call msg_done,VM launched successfully.)
@@ -193,7 +224,7 @@ run-installed:
 		echo "Disk image missing at $(DISK_FILE). Run 'make image' first."; \
 		exit 1; \
 	fi
-	qemu-system-x86_64 $(QEMU_COMMON_ARGS) $(QEMU_NET_ARGS) \
+	qemu-system-x86_64 $(QEMU_COMMON_ARGS) $(QEMU_NET_ARGS) $(QEMU_CACHE_ARGS) \
 	  -boot c
 	$(call msg_done,Installed system booted successfully.)
 
@@ -223,6 +254,12 @@ help:
 	@echo "  $(BLUE)run-installed$(RESET) - Boot the installed system from disk"
 	@echo "  $(BLUE)logs$(RESET)       - Tail /var/log/archenemy-install.log via SSH"
 	@echo "  $(BLUE)ssh$(RESET)        - Open an SSH session to the guest"
+	@echo "  $(BLUE)cache$(RESET)      - Prepare shared pacman cache directory"
+	@echo "  $(BLUE)cache-clean$(RESET) - Remove the shared pacman cache directory"
 	@echo "  $(BLUE)clean$(RESET)      - Clean environment"
 	@echo "  $(BLUE)help$(RESET)       - Show this help message\n"
 	@echo "Example: make prepare && make run\n"
+	@echo "Set USE_CACHE=1 when running 'make run' or 'make run-installed' to attach $(PACMAN_CACHE_DIR)"
+	@echo "into the guest via virtio-9p (mount tag '$(CACHE_MOUNT_TAG)'). Inside the VM, run:"
+	@echo "  curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/dev/archenemy-vm/bootstrap-vm.sh | bash"
+	@echo "The VM bootstrap script mounts the shared cache automatically before invoking the installer.\n"
