@@ -37,15 +37,21 @@ The project is named `archenemy` (all lowercase).
 
 ### Quick Start
 
-1. Boot into a vanilla Arch environment (live ISO or freshly installed target) with working networking.
-2. Pull and run the bootstrapper:
+1. Boot the live ISO, partition/mount `/mnt`, and (optionally) bind `/mnt/var/cache/pacman/pkg` to avoid running out of space while `archinstall` downloads packages.
+2. Run `archinstall` (or your manual base install) but **do not reboot yet**. Inside the live environment/chroot run phase 1 (steps 1 & 3: base system + drivers/networking):
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash
+   ARCHENEMY_PHASE=preinstall sh -c 'curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash'
    ```
-   The script installs git, clones `~/.config/archenemy`, and launches `installation/boot.sh`.
-3. Follow the prompts; every step logs to `/var/log/archenemy-install.log`. If something fails, use `tail -f /var/log/archenemy-install.log` (or `make logs` in the VM harness) to inspect the failure before retrying.
+   Phase 1 covers pacman/GPG/sudo, copies defaults that are safe during chroot, and leaves a sentinel so phase 2 knows you already completed this stage.
+3. Reboot into the newly installed system (boot from disk). Log in as your user; the first interactive TTY session will prompt you to continue phase 2 automatically. Accept the prompt (or run the command manually) to execute phase 2 (steps 2, 4–8: bootloader, graphics, dotfiles, daemons, cleanup, reboot):
+   ```bash
+   ARCHENEMY_PHASE=postinstall sh -c 'curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash'
+   ```
+   This completes the remaining steps (bootloader, drivers, graphics, daemons, cleanup, reboot) with systemd fully active.
 
-> You can rerun `~/.config/archenemy/installation/boot.sh` at any time; the installer is idempotent until the cleanup step completes.
+Every run logs to `/var/log/archenemy-install.log`. Use `tail -f` or the VM harness (`make logs`) to inspect failures and resume.
+
+> `ARCHENEMY_PHASE` defaults to `postinstall`, so running the installer on a fully booted system needs no extra flags. Set `ARCHENEMY_PHASE=preinstall` explicitly when executing from the ISO/chroot.
 
 ### Orchestrator: `installation/boot.sh`
 
@@ -84,6 +90,7 @@ The installer exposes a few canonical directories so every step references the s
 | Variable                             | Description                                                               |
 | ------------------------------------ | ------------------------------------------------------------------------- |
 | `ARCHENEMY_DEFAULTS_DIR`             | Repository defaults (system templates such as pacman, gpg, Plymouth)      |
+| `ARCHENEMY_ARCHINSTALL_DIR`          | Installer state directory (`archinstall` artifacts, sentinels, etc.)      |
 | `ARCHENEMY_USER_DOTFILES_DIR`        | User-editable copy of `default/dotfiles` (synced to `~/.config/dotfiles`) |
 | `ARCHENEMY_DEFAULTS_BASE_SYSTEM_DIR` | Step 1 assets (`pacman/`, `gpg/`, `sudoers/`)                             |
 | `ARCHENEMY_DEFAULTS_BOOTLOADER_DIR`  | Step 2 assets (`plymouth/`, `sddm/`, `mkinitcpio/`)                       |
@@ -92,6 +99,7 @@ The installer exposes a few canonical directories so every step references the s
 | `ARCHENEMY_DEFAULTS_DOTFILES_DIR`    | Step 5 blueprint (`alacritty/`, `ghostty/`, `zsh/`, etc.)                 |
 | `ARCHENEMY_DEFAULTS_DAEMONS_DIR`     | Step 6 daemon assets (`systemd/user` timers, etc.)                        |
 | `ARCHENEMY_DEFAULTS_CLEANUP_DIR`     | Step 7 cleanup templates (reserved)                                       |
+| `ARCHENEMY_DEFAULTS_INSTALL_SENTINEL_DIR` | Login sentinel assets (`postinstall-profile.sh`, etc.)                |
 
 Each step sources `installation/common.sh` so these variables and the shared logging helpers are recognized by shellcheck.
 
@@ -163,7 +171,7 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 **File**: `installation/steps/drivers.sh`  
 **Entry Point**: `run_setup_drivers()`
 
-**Description**: Installs networking/peripheral services and GPU drivers for Intel, AMD, and NVIDIA hardware, including hybrid configurations.
+**Description**: Installs networking/peripheral services and GPU drivers for Intel, AMD, and NVIDIA hardware, including hybrid configurations. This step runs during phase 1 (`ARCHENEMY_PHASE=preinstall`) so Wi-Fi/ethernet support is ready before the first reboot.
 
 **Requirements**:
 

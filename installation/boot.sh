@@ -46,7 +46,8 @@ export ARCHENEMY_ONLINE_INSTALL=true
 : "${ARCHENEMY_PATH:="$HOME/.config/archenemy"}"
 export ARCHENEMY_PATH
 export ARCHENEMY_INSTALL_LOG_FILE="/var/log/archenemy-install.log"
-export ARCHENEMY_CHROOT_INSTALL=true
+: "${ARCHENEMY_PHASE:=postinstall}" # preinstall = chroot/first-run, postinstall = post-reboot
+export ARCHENEMY_PHASE
 export PATH="$ARCHENEMY_PATH/bin:$PATH"
 export CUSTOM_REPO="${CUSTOM_REPO:-aldochaconc/archenemy}"
 export CUSTOM_REF="${CUSTOM_REF:-main}"
@@ -73,6 +74,26 @@ ensure_log_file "$ARCHENEMY_INSTALL_LOG_FILE"
 # shellcheck source=./common.sh
 source "./common.sh"
 
+if [[ "$ARCHENEMY_PHASE" == "preinstall" ]]; then
+  export ARCHENEMY_CHROOT_INSTALL=true
+else
+  export ARCHENEMY_CHROOT_INSTALL=false
+fi
+
+display_phase1_completion_message() {
+  _display_splash
+  local completion_banner='
+
+============================================================
+Phase 1 complete. Reboot into the installed system, log in,
+and run the installer again with 
+'ARCHENEMY_PHASE=postinstall' to continue.
+============================================================
+
+'
+  printf "%s\n" "$completion_banner"
+}
+
 ################################################################################
 # MAIN ORCHESTRATOR
 ################################################################################
@@ -83,57 +104,76 @@ source "./common.sh"
 # All step files use relative paths from the repository root, allowing shellcheck
 # to validate function calls and variable usage across files.
 #
-main() {
-  log_info "archenemy installer orchestrator starting..."
-  _require_online_install
-  setup_error_trap
-
-  # Source and execute each installation step in sequence.
-  # Shellcheck can follow these paths because boot.sh is executed from within
-  # the cloned repository.
-
-  # Step 1: System Preparation - Configure pacman, GPG, sudo, AUR helper
-  # shellcheck source=./steps/base_system.sh
+# -----------------------------------------------------------------------------
+# run_phase_preinstall
+# Runs the subset of steps that are safe during the chroot/liverun phase:
+#   - Step 1: system preparation
+#   - Step 3: drivers & networking
+# Leaves a sentinel plus /etc/profile.d hook so the user is prompted to resume
+# phase 2 after reboot.
+# -----------------------------------------------------------------------------
+run_phase_preinstall() {
+  log_info "Phase 1 (preinstall) starting..."
+  # Step 1
   source "./steps/base_system.sh"
   run_setup_base_system
 
-  # Step 2: Bootloader & Display - Configure Limine, Plymouth, SDDM
-  # shellcheck source=./steps/bootloader.sh
-  source "./steps/bootloader.sh"
-  run_setup_bootloader
-
-  # Step 3: Drivers & Hardware - Install networking, peripherals, GPU drivers
-  # shellcheck source=./steps/drivers.sh
+  # Step 3 (networking, drivers)
   source "./steps/drivers.sh"
   run_setup_drivers
 
-  # Step 4: Graphics Environment - Install Hyprland stack, GTK, keyring
-  # shellcheck source=./steps/graphics.sh
+  display_phase1_completion_message
+  run_cmd "$BOOT_DIR/install-sentinel" register
+}
+
+# -----------------------------------------------------------------------------
+# run_phase_postinstall
+# Executes the remaining steps once the system has booted from disk:
+# bootloader, graphics, dotfiles, daemons, cleanup, and final reboot prompt.
+# -----------------------------------------------------------------------------
+run_phase_postinstall() {
+  log_info "Phase 2 (postinstall) starting..."
+
+  source "./steps/bootloader.sh"
+  run_setup_bootloader
+
   source "./steps/graphics.sh"
   run_setup_graphics
 
-  # Step 5: Dotfiles - Apply ~/.config dotfiles and Git identity
-  # shellcheck source=./steps/dotfiles.sh
   source "./steps/dotfiles.sh"
   run_setup_dotfiles
 
-  # Step 6: Services Configuration - Configure firewall, DNS, power management
-  # shellcheck source=./steps/daemons.sh
   source "./steps/daemons.sh"
   run_setup_daemons
 
-  # Step 7: Cleanup - Remove temporary files and restore defaults
-  # shellcheck source=./steps/cleanup.sh
   source "./steps/cleanup.sh"
   run_cleanup
 
-  # Step 8: Reboot - Display completion message and prompt for reboot
-  # shellcheck source=./steps/reboot.sh
+  run_cmd "$BOOT_DIR/install-sentinel" remove
+
   source "./steps/reboot.sh"
   run_reboot
+}
+
+main() {
+  log_info "archenemy installer orchestrator starting (phase: $ARCHENEMY_PHASE)..."
+  _require_online_install
+  setup_error_trap
+
+  case "$ARCHENEMY_PHASE" in
+  preinstall)
+    run_phase_preinstall
+    ;;
+  postinstall)
+    run_phase_postinstall
+    ;;
+  *)
+    log_error "Unknown ARCHENEMY_PHASE '$ARCHENEMY_PHASE'. Use 'preinstall' or 'postinstall'."
+    exit 1
+    ;;
+  esac
 
   log_success "archenemy installation completed."
 }
 
-# --- Script Entry Point ---
 main "$@"
