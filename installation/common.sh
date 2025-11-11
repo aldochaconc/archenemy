@@ -18,13 +18,14 @@ export ARCHENEMY_COMMON_SOURCED=true
 : "${ARCHENEMY_INSTALL_ROOT:="$ARCHENEMY_PATH/installation"}"
 : "${ARCHENEMY_USER_CONFIG_DIR:="$HOME/.config"}"
 : "${ARCHENEMY_USER_DOTFILES_DIR:="$ARCHENEMY_USER_CONFIG_DIR/dotfiles"}"
+: "${ARCHENEMY_ARCHINSTALL_DIR:="${ARCHENEMY_PATH}/archinstall"}"
 
 export ARCHENEMY_PATH
 export ARCHENEMY_INSTALL_ROOT
 export ARCHENEMY_USER_CONFIG_DIR
 export ARCHENEMY_USER_DOTFILES_DIR
+export ARCHENEMY_ARCHINSTALL_DIR
 export ARCHENEMY_DEFAULTS_DIR="${ARCHENEMY_PATH}/default"
-export ARCHENEMY_ARCHINSTALL_DIR="${ARCHENEMY_PATH}/archinstall"
 export ARCHENEMY_DEFAULTS_BASE_SYSTEM_DIR="${ARCHENEMY_DEFAULTS_DIR}/base_system"
 export ARCHENEMY_DEFAULTS_BOOTLOADER_DIR="${ARCHENEMY_DEFAULTS_DIR}/bootloader"
 export ARCHENEMY_DEFAULTS_DRIVERS_DIR="${ARCHENEMY_DEFAULTS_DIR}/drivers"
@@ -33,6 +34,80 @@ export ARCHENEMY_DEFAULTS_DOTFILES_DIR="${ARCHENEMY_DEFAULTS_DIR}/dotfiles"
 export ARCHENEMY_DEFAULTS_DAEMONS_DIR="${ARCHENEMY_DEFAULTS_DIR}/daemons"
 export ARCHENEMY_DEFAULTS_CLEANUP_DIR="${ARCHENEMY_DEFAULTS_DIR}/cleanup"
 export ARCHENEMY_DEFAULTS_INSTALL_SENTINEL_DIR="${ARCHENEMY_DEFAULTS_DIR}/install_sentinel"
+
+################################################################################
+# INSTALLATION UTILITIES
+################################################################################
+
+ensure_install_log_file() {
+  local log_file="${1:-$ARCHENEMY_INSTALL_LOG_FILE}"
+  local log_dir
+  log_dir="$(dirname "$log_file")"
+
+  sudo install -d -m 755 "$log_dir"
+  if [[ ! -f "$log_file" ]]; then
+    sudo touch "$log_file"
+  fi
+  sudo chown "$USER":"$USER" "$log_file"
+  sudo chmod 644 "$log_file"
+}
+
+archenemy_detect_phase() {
+  local explicit="${1:-${ARCHENEMY_PHASE:-}}"
+  if [[ -n "$explicit" ]]; then
+    echo "$explicit"
+    return
+  fi
+
+  local sentinel="$ARCHENEMY_ARCHINSTALL_DIR/postinstall-required"
+  if [[ -f "$sentinel" ]]; then
+    echo "postinstall"
+    return
+  fi
+
+  if grep -q 'archiso' /proc/cmdline 2>/dev/null || [[ -d /run/archiso ]]; then
+    echo "preinstall"
+    return
+  fi
+
+  if [[ -d /mnt && -f /mnt/etc/arch-release ]]; then
+    echo "preinstall"
+    return
+  fi
+
+  if command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt --chroot >/dev/null 2>&1; then
+    echo "preinstall"
+    return
+  fi
+
+  echo "postinstall"
+}
+
+display_phase1_completion_message() {
+  _display_splash
+  local completion_banner='
+
+============================================================
+Phase 1 complete. Reboot into the installed system, log in,
+and run the installer again to continue with phase 2.
+============================================================
+
+'
+  printf "%s\n" "$completion_banner"
+}
+
+archenemy_initialize_phase() {
+  if [[ -z "${ARCHENEMY_PHASE:-}" ]]; then
+    ARCHENEMY_PHASE="$(archenemy_detect_phase)"
+  fi
+  export ARCHENEMY_PHASE
+
+  if [[ "$ARCHENEMY_PHASE" == "preinstall" ]]; then
+    export ARCHENEMY_CHROOT_INSTALL=true
+  else
+    export ARCHENEMY_CHROOT_INSTALL=false
+  fi
+}
 
 ################################################################################
 # DRY RUN & COMMAND EXECUTION

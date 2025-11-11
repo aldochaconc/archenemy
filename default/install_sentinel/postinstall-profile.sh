@@ -17,17 +17,17 @@ cat <<'MSG'
 
 ============================================================
 Archenemy phase 1 detected. Continue with post-install setup?
-This will run ARCHENEMY_PHASE=postinstall installation/boot.sh
+This will resume installation/boot.sh in post-install mode.
 ============================================================
 
 MSG
 
 read -r -p "Continue now? [Y/n] " answer
 case "$answer" in
-  n|N) echo "You can rerun later with: ARCHENEMY_PHASE=postinstall $BOOT_SH"; return ;;
+  n|N) echo "You can rerun later with: $BOOT_SH"; return ;;
 esac
 
-ARCHENEMY_PHASE=postinstall "$BOOT_SH"
+"$BOOT_SH"
 status=$?
 if [ $status -eq 0 ]; then
   rm -f "$SENTINEL"

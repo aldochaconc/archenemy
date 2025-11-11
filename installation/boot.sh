@@ -44,10 +44,11 @@ cd "$BOOT_DIR"
 #
 export ARCHENEMY_ONLINE_INSTALL=true
 : "${ARCHENEMY_PATH:="$HOME/.config/archenemy"}"
+: "${ARCHENEMY_ARCHINSTALL_DIR:="$ARCHENEMY_PATH/archinstall"}"
+: "${ARCHENEMY_PHASE:=""}"
 export ARCHENEMY_PATH
+export ARCHENEMY_ARCHINSTALL_DIR
 export ARCHENEMY_INSTALL_LOG_FILE="/var/log/archenemy-install.log"
-: "${ARCHENEMY_PHASE:=postinstall}" # preinstall = chroot/first-run, postinstall = post-reboot
-export ARCHENEMY_PHASE
 export PATH="$ARCHENEMY_PATH/bin:$PATH"
 export CUSTOM_REPO="${CUSTOM_REPO:-aldochaconc/archenemy}"
 export CUSTOM_REF="${CUSTOM_REF:-main}"
@@ -55,44 +56,11 @@ export ARCHENEMY_USER_NAME="${ARCHENEMY_USER_NAME:-}"
 export ARCHENEMY_USER_EMAIL="${ARCHENEMY_USER_EMAIL:-}"
 
 # shellcheck source=./common.sh
-# Ensure log file exists and is writable for the current user.
-ensure_log_file() {
-  local log_file="$1"
-  local log_dir
-  log_dir="$(dirname "$log_file")"
-
-  sudo install -d -m 755 "$log_dir"
-  if [[ ! -f "$log_file" ]]; then
-    sudo touch "$log_file"
-  fi
-  sudo chown "$USER":"$USER" "$log_file"
-  sudo chmod 644 "$log_file"
-}
-
-ensure_log_file "$ARCHENEMY_INSTALL_LOG_FILE"
-
-# shellcheck source=./common.sh
 source "./common.sh"
 
-if [[ "$ARCHENEMY_PHASE" == "preinstall" ]]; then
-  export ARCHENEMY_CHROOT_INSTALL=true
-else
-  export ARCHENEMY_CHROOT_INSTALL=false
-fi
+ensure_install_log_file "$ARCHENEMY_INSTALL_LOG_FILE"
 
-display_phase1_completion_message() {
-  _display_splash
-  local completion_banner='
-
-============================================================
-Phase 1 complete. Reboot into the installed system, log in,
-and run the installer again with 
-'ARCHENEMY_PHASE=postinstall' to continue.
-============================================================
-
-'
-  printf "%s\n" "$completion_banner"
-}
+archenemy_initialize_phase
 
 ################################################################################
 # MAIN ORCHESTRATOR
