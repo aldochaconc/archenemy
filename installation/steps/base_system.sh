@@ -179,6 +179,11 @@ _detect_primary_user() {
 # install packages from the Arch User Repository.
 #
 _install_aur_helper() {
+  if command -v yay >/dev/null 2>&1; then
+    log_info "AUR helper (yay) already installed. Skipping rebuild."
+    return
+  fi
+
   log_info "Installing AUR helper (yay)..."
   _install_pacman_packages "git" "go"
 
@@ -188,11 +193,18 @@ _install_aur_helper() {
 
   local build_root
   build_root="$(mktemp -d /tmp/archenemy-yay.XXXXXX)"
-  run_cmd sudo chown "$aur_user":"$aur_user" "$build_root"
+  if [[ "$EUID" -eq 0 ]]; then
+    run_cmd sudo chown "$aur_user":"$aur_user" "$build_root"
+  fi
 
   local repo_dir="$build_root/yay"
-  run_cmd sudo -u "$aur_user" git clone https://aur.archlinux.org/yay.git "$repo_dir"
-  run_cmd sudo -u "$aur_user" bash -c "cd '$repo_dir' && makepkg -s --noconfirm"
+  if [[ "$EUID" -eq 0 ]]; then
+    run_cmd sudo -u "$aur_user" git clone https://aur.archlinux.org/yay.git "$repo_dir"
+    run_cmd sudo -u "$aur_user" bash -c "cd '$repo_dir' && makepkg -s --noconfirm"
+  else
+    run_cmd git clone https://aur.archlinux.org/yay.git "$repo_dir"
+    run_cmd bash -c "cd '$repo_dir' && makepkg -s --noconfirm"
+  fi
 
   local pkg_file
   pkg_file="$(find "$repo_dir" -maxdepth 1 -type f -name 'yay-*.pkg.tar.*' | sort | tail -n1)"
@@ -202,7 +214,19 @@ _install_aur_helper() {
   fi
 
   run_cmd sudo pacman -U --noconfirm "$pkg_file"
-  run_cmd sudo rm -rf "$build_root"
+  if [[ "$EUID" -eq 0 ]]; then
+    run_cmd sudo rm -rf "$build_root"
+  else
+    run_cmd rm -rf "$build_root"
+  fi
+}
+
+run_install_aur_helper_if_needed() {
+  if [[ "$ARCHENEMY_CHROOT_INSTALL" == true ]]; then
+    log_info "Skipping AUR helper install inside chroot; it will be installed after reboot."
+    return
+  fi
+  _install_aur_helper
 }
 
 ################################################################################
@@ -231,7 +255,7 @@ run_setup_base_system() {
   _install_base_packages
 
   # --- 7. Install AUR helper (yay) ---
-  _install_aur_helper
+  run_install_aur_helper_if_needed
 
   log_success "System preparation completed."
 }

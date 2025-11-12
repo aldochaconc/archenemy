@@ -102,6 +102,9 @@ run_phase_preinstall() {
 run_phase_postinstall() {
   log_info "Phase 2 (postinstall) starting..."
 
+  source "./steps/base_system.sh"
+  run_install_aur_helper_if_needed
+
   source "./steps/bootloader.sh"
   run_setup_bootloader
 
