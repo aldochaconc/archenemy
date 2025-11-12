@@ -2,12 +2,12 @@
 #  Archenemy QEMU Harness (minimal, reproducible)
 # ==============================================================================
 #
-#  This Makefile provisions a VM with two virtio disks so we can run Archinstall
-#  exactly like on bare metal and then test the post-install script via SSH.
+#  This Makefile provisions a VM with a single virtio disk so we can run
+#  Archinstall exactly like on bare metal and then test the post-install script.
 #
 #  Targets:
 #    make iso         -> Download the latest Arch ISO
-#    make disks       -> Create OS + data qcow2 disks
+#    make disks       -> Create the qcow2 disk
 #    make run-live    -> Boot from ISO (install / run phase 1)
 #    make run-disk    -> Boot from installed disk (phase 2 / daily use)
 #    make ssh         -> Open SSH session to the guest (needs sshd in guest)
@@ -15,7 +15,7 @@
 #    make clean       -> Remove ISO/disks
 #
 #  Override any variable below on the command line, e.g.
-#    make run-live RAM_MB=6144 PRIMARY_DISK_SIZE=120G
+#    make run-live RAM_MB=6144 DISK_SIZE=120G
 # ==============================================================================
 
 VM_NAME            ?= archenemy-dev
@@ -24,10 +24,8 @@ WORKDIR            ?= $(CURDIR)/.vm-harness
 ISO_URL            ?= https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso
 ISO_PATH           := $(WORKDIR)/archlinux.iso
 
-PRIMARY_DISK_SIZE  ?= 80G
-PRIMARY_DISK_PATH  := $(WORKDIR)/$(VM_NAME).qcow2
-DATA_DISK_SIZE     ?= 80G
-DATA_DISK_PATH     := $(WORKDIR)/$(VM_NAME)-data.qcow2
+DISK_SIZE          ?= 80G
+DISK_PATH          := $(WORKDIR)/$(VM_NAME).qcow2
 
 RAM_MB             ?= 4096
 CPUS               ?= 4
@@ -53,8 +51,7 @@ QEMU_COMMON_FLAGS = \
 	-device virtio-vga
 
 QEMU_DISK_FLAGS = \
-	-drive if=virtio,format=qcow2,file=$(PRIMARY_DISK_PATH) \
-	-drive if=virtio,format=qcow2,file=$(DATA_DISK_PATH)
+	-drive if=virtio,format=qcow2,file=$(DISK_PATH)
 
 .PHONY: all iso disks run-live run-disk ssh test-script clean help
 
@@ -74,10 +71,8 @@ iso: $(WORKDIR)
 	fi
 
 disks: $(WORKDIR)
-	@echo "[INFO] Creating primary disk ($(PRIMARY_DISK_SIZE)) at $(PRIMARY_DISK_PATH)"
-	qemu-img create -f qcow2 "$(PRIMARY_DISK_PATH)" $(PRIMARY_DISK_SIZE)
-	@echo "[INFO] Creating data disk ($(DATA_DISK_SIZE)) at $(DATA_DISK_PATH)"
-	qemu-img create -f qcow2 "$(DATA_DISK_PATH)" $(DATA_DISK_SIZE)
+	@echo "[INFO] Creating disk ($(DISK_SIZE)) at $(DISK_PATH)"
+	qemu-img create -f qcow2 "$(DISK_PATH)" $(DISK_SIZE)
 	@echo "[DONE] Disks created."
 
 run-live: iso disks
@@ -89,7 +84,7 @@ run-live: iso disks
 		-boot order=d
 
 run-disk: disks
-	@if [ ! -f "$(PRIMARY_DISK_PATH)" ]; then echo "Missing disk. Run 'make disks'."; exit 1; fi
+	@if [ ! -f "$(DISK_PATH)" ]; then echo "Missing disk. Run 'make disks'."; exit 1; fi
 	@echo "[INFO] Booting from disk..."
 	$(QEMU_BIN) $(QEMU_COMMON_FLAGS) \
 		$(QEMU_DISK_FLAGS) \
@@ -104,8 +99,8 @@ test-script:
 	ssh -p $(SSH_PORT) $(SSH_USER)@localhost "sh -c '$(ARCHENEMY_INSTALL_CMD)'"
 
 clean:
-	@echo "[WARN] Removing ISO and disks ..."
-	rm -f "$(ISO_PATH)" "$(PRIMARY_DISK_PATH)" "$(DATA_DISK_PATH)"
+	@echo "[WARN] Removing ISO and disk ..."
+	rm -f "$(ISO_PATH)" "$(DISK_PATH)"
 	@echo "[DONE] Cleaned."
 
 help:
@@ -113,12 +108,12 @@ help:
 	@echo "Archenemy VM Harness"
 	@echo "---------------------"
 	@echo "make iso         Download latest Arch ISO ($(ISO_URL))"
-	@echo "make disks       Create $(PRIMARY_DISK_PATH) ($(PRIMARY_DISK_SIZE)) and $(DATA_DISK_PATH) ($(DATA_DISK_SIZE))"
+	@echo "make disks       Create $(DISK_PATH) ($(DISK_SIZE))"
 	@echo "make run-live    Boot VM from the ISO (install / phase 1)"
 	@echo "make run-disk    Boot the installed system from disk (phase 2 / testing)"
 	@echo "make ssh         SSH into the guest (requires sshd + password in VM)"
 	@echo "make test-script Run the installer remotely via SSH (uses ARCHENEMY_INSTALL_CMD)"
-	@echo "make clean       Remove ISO and qcow2 disks"
+	@echo "make clean       Remove ISO and qcow2 disk"
 	@echo ""
 	@echo "Inside the live ISO:"
 	@echo "  1. Run archinstall but DO NOT reboot."

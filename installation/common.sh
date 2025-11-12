@@ -11,7 +11,7 @@
 if [[ "${ARCHENEMY_COMMON_SOURCED:-false}" == true ]]; then
   return 0
 fi
-export ARCHENEMY_COMMON_SOURCED=true
+ARCHENEMY_COMMON_SOURCED=true
 
 # --- Canonical Paths ---------------------------------------------------------
 : "${ARCHENEMY_PATH:="$HOME/.config/archenemy"}"
