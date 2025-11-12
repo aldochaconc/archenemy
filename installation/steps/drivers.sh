@@ -111,7 +111,6 @@ _setup_peripherals() {
   # Enable printing support
   _enable_service "cups.service"
   _enable_service "avahi-daemon.service"
-  _enable_service "cups-browsed.service"
 
   ################################################################################
   # Disable USB autosuspend
