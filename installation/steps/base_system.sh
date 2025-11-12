@@ -145,6 +145,33 @@ _install_base_packages() {
   _install_pacman_packages "base-devel"
 }
 
+_detect_primary_user() {
+  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    echo "$SUDO_USER"
+    return
+  fi
+
+  if [[ "$EUID" -ne 0 && "${USER:-}" != "root" ]]; then
+    echo "$USER"
+    return
+  fi
+
+  if [[ -n "${ARCHENEMY_USER_NAME:-}" ]] && id -u "$ARCHENEMY_USER_NAME" >/dev/null 2>&1; then
+    echo "$ARCHENEMY_USER_NAME"
+    return
+  fi
+
+  local first_user
+  first_user="$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1; exit}' /etc/passwd)"
+  if [[ -n "$first_user" ]]; then
+    echo "$first_user"
+    return
+  fi
+
+  log_error "Unable to locate a non-root user for AUR builds. Create a user before running the installer."
+  exit 1
+}
+
 ################################################################################
 # AUR HELPER
 # Installs 'yay' AUR helper. This is done by cloning its repository
@@ -153,15 +180,29 @@ _install_base_packages() {
 #
 _install_aur_helper() {
   log_info "Installing AUR helper (yay)..."
-  _install_pacman_packages "git"
-  local yay_dir="/tmp/yay-install"
-  run_cmd rm -rf "$yay_dir"
-  run_cmd git clone https://aur.archlinux.org/yay.git "$yay_dir"
-  (
-    cd "$yay_dir" || exit 1
-    run_cmd makepkg -si --noconfirm
-  )
-  run_cmd rm -rf "$yay_dir"
+  _install_pacman_packages "git" "go"
+
+  local aur_user
+  aur_user="$(_detect_primary_user)"
+  log_info "Using user '$aur_user' to build yay via makepkg."
+
+  local build_root
+  build_root="$(mktemp -d /tmp/archenemy-yay.XXXXXX)"
+  run_cmd sudo chown "$aur_user":"$aur_user" "$build_root"
+
+  local repo_dir="$build_root/yay"
+  run_cmd sudo -u "$aur_user" git clone https://aur.archlinux.org/yay.git "$repo_dir"
+  run_cmd sudo -u "$aur_user" bash -c "cd '$repo_dir' && makepkg -s --noconfirm"
+
+  local pkg_file
+  pkg_file="$(find "$repo_dir" -maxdepth 1 -type f -name 'yay-*.pkg.tar.*' | sort | tail -n1)"
+  if [[ -z "$pkg_file" ]]; then
+    log_error "makepkg did not produce a yay package. Check the build logs above."
+    exit 1
+  fi
+
+  run_cmd sudo pacman -U --noconfirm "$pkg_file"
+  run_cmd sudo rm -rf "$build_root"
 }
 
 ################################################################################
