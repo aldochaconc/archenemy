@@ -62,6 +62,97 @@ require_online() {
   exit 1
 }
 
+detect_primary_user() {
+  local root="${ARCHENEMY_TARGET_ROOT:-/}"
+  local passwd_file="$root/etc/passwd"
+  local requested_user="${ARCHENEMY_USER_NAME:-}"
+  local entry=""
+
+  if [[ ! -f "$passwd_file" ]]; then
+    log_error "Unable to read $passwd_file to detect the desktop user."
+    exit 1
+  fi
+
+  if [[ -n "$requested_user" ]]; then
+    entry="$(grep -E "^${requested_user}:" "$passwd_file" | head -n1 || true)"
+    if [[ -z "$entry" ]]; then
+      log_error "ARCHENEMY_USER_NAME '$requested_user' was not found in $passwd_file."
+      exit 1
+    fi
+  else
+    entry="$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $0; exit}' "$passwd_file")"
+    if [[ -z "$entry" ]]; then
+      log_error "No non-root users (UID >= 1000) were found in $passwd_file. Create your desktop user before running archenemy."
+      exit 1
+    fi
+  fi
+
+  IFS=: read -r PRIMARY_USER _ PRIMARY_UID PRIMARY_GID _ PRIMARY_HOME _ <<<"$entry"
+  if [[ -z "${PRIMARY_HOME:-}" || "${PRIMARY_HOME:0:1}" != "/" ]]; then
+    log_error "User '$PRIMARY_USER' has an invalid home directory entry."
+    exit 1
+  fi
+
+  ARCHENEMY_PRIMARY_USER="$PRIMARY_USER"
+  ARCHENEMY_PRIMARY_UID="$PRIMARY_UID"
+  ARCHENEMY_PRIMARY_GID="$PRIMARY_GID"
+  ARCHENEMY_PRIMARY_HOME="$PRIMARY_HOME"
+}
+
+resolve_user_home_paths() {
+  local root="${ARCHENEMY_TARGET_ROOT:-/}"
+  local rel_home="$ARCHENEMY_PRIMARY_HOME"
+
+  if [[ "$root" == "/" ]]; then
+    ARCHENEMY_PRIMARY_HOME_HOST="$rel_home"
+  else
+    ARCHENEMY_PRIMARY_HOME_HOST="$root$rel_home"
+  fi
+
+  if [[ ! -d "$ARCHENEMY_PRIMARY_HOME_HOST" ]]; then
+    log_error "Home directory $ARCHENEMY_PRIMARY_HOME_HOST does not exist. Verify the user was created during archinstall."
+    exit 1
+  fi
+}
+
+configure_archenemy_paths() {
+  if [[ "$ARCHENEMY_PATH_USER_DEFINED" == false ]]; then
+    ARCHENEMY_PATH="${ARCHENEMY_PRIMARY_HOME_HOST}/.config/archenemy"
+  fi
+
+  if [[ "$RUN_IN_CHROOT" == true ]]; then
+    case "$ARCHENEMY_PATH" in
+      "$ARCHENEMY_TARGET_ROOT"*)
+        ;;
+      *)
+        log_error "ARCHENEMY_PATH ($ARCHENEMY_PATH) must reside inside ARCHENEMY_TARGET_ROOT ($ARCHENEMY_TARGET_ROOT)."
+        exit 1
+        ;;
+    esac
+    ARCHENEMY_PATH_IN_CHROOT="${ARCHENEMY_PATH#"$ARCHENEMY_TARGET_ROOT"}"
+    [[ "$ARCHENEMY_PATH_IN_CHROOT" == /* ]] || ARCHENEMY_PATH_IN_CHROOT="/$ARCHENEMY_PATH_IN_CHROOT"
+    ARCHENEMY_HOME_FOR_BOOT="$ARCHENEMY_PRIMARY_HOME"
+    log_info "Live ISO detected; cloning into ${ARCHENEMY_PATH} and launching via arch-chroot."
+  else
+    ARCHENEMY_PATH_IN_CHROOT="$ARCHENEMY_PATH"
+    ARCHENEMY_HOME_FOR_BOOT="$ARCHENEMY_PRIMARY_HOME_HOST"
+  fi
+
+  export ARCHENEMY_USER_NAME="$ARCHENEMY_PRIMARY_USER"
+}
+
+chown_repo_to_primary_user() {
+  if [[ $EUID -ne 0 ]]; then
+    return
+  fi
+  if [[ -z "${ARCHENEMY_PRIMARY_UID:-}" || -z "${ARCHENEMY_PRIMARY_GID:-}" ]]; then
+    return
+  fi
+  if [[ -d "$ARCHENEMY_PATH" ]]; then
+    chown -R "${ARCHENEMY_PRIMARY_UID}:${ARCHENEMY_PRIMARY_GID}" "$ARCHENEMY_PATH"
+  fi
+}
+
 setup_install_context() {
   local detected_root="${ARCHENEMY_TARGET_ROOT:-}"
   if [[ -z "$detected_root" ]]; then
@@ -80,19 +171,6 @@ setup_install_context() {
 
     RUN_IN_CHROOT=true
 
-    if [[ "$ARCHENEMY_PATH_USER_DEFINED" == false ]]; then
-      ARCHENEMY_PATH="${detected_root}${ARCHENEMY_PATH}"
-    fi
-
-    case "$ARCHENEMY_PATH" in
-    "$detected_root"*)
-      ;;
-    *)
-      log_error "ARCHENEMY_PATH ($ARCHENEMY_PATH) must reside inside ARCHENEMY_TARGET_ROOT ($detected_root)."
-      exit 1
-      ;;
-    esac
-
     if ! command -v arch-chroot >/dev/null 2>&1; then
       log_error "arch-chroot is required when running from the live ISO (package: arch-install-scripts)."
       exit 1
@@ -101,14 +179,6 @@ setup_install_context() {
 
   ARCHENEMY_TARGET_ROOT="$detected_root"
   export ARCHENEMY_TARGET_ROOT
-
-  if [[ "$RUN_IN_CHROOT" == true ]]; then
-    ARCHENEMY_PATH_IN_CHROOT="${ARCHENEMY_PATH#"$ARCHENEMY_TARGET_ROOT"}"
-    [[ "$ARCHENEMY_PATH_IN_CHROOT" == /* ]] || ARCHENEMY_PATH_IN_CHROOT="/$ARCHENEMY_PATH_IN_CHROOT"
-    log_info "Live ISO detected; cloning into ${ARCHENEMY_PATH} and launching via arch-chroot."
-  else
-    ARCHENEMY_PATH_IN_CHROOT="$ARCHENEMY_PATH"
-  fi
 }
 
 clone_repo_with_git() {
@@ -176,12 +246,16 @@ ensure_chroot_prereqs() {
 launch_main_installer() {
   log_info "Launching main installer..."
   if [[ "$RUN_IN_CHROOT" == true ]]; then
-    env CUSTOM_REPO="$CUSTOM_REPO" CUSTOM_REF="$CUSTOM_REF" ARCHENEMY_PATH="$ARCHENEMY_PATH_IN_CHROOT" \
+    env CUSTOM_REPO="$CUSTOM_REPO" CUSTOM_REF="$CUSTOM_REF" \
+      ARCHENEMY_PATH="$ARCHENEMY_PATH_IN_CHROOT" \
+      ARCHENEMY_HOME="$ARCHENEMY_HOME_FOR_BOOT" \
       arch-chroot "$ARCHENEMY_TARGET_ROOT" /bin/bash "$ARCHENEMY_PATH_IN_CHROOT/installation/boot.sh"
     return
   fi
 
-  env CUSTOM_REPO="$CUSTOM_REPO" CUSTOM_REF="$CUSTOM_REF" ARCHENEMY_PATH="$ARCHENEMY_PATH" \
+  env CUSTOM_REPO="$CUSTOM_REPO" CUSTOM_REF="$CUSTOM_REF" \
+    ARCHENEMY_PATH="$ARCHENEMY_PATH" \
+    ARCHENEMY_HOME="$ARCHENEMY_HOME_FOR_BOOT" \
     bash "$ARCHENEMY_PATH/installation/boot.sh"
 }
 
@@ -189,7 +263,11 @@ launch_main_installer() {
 # Main
 # ------------------------------------------------------------------------------
 setup_install_context
+detect_primary_user
+resolve_user_home_paths
+configure_archenemy_paths
 require_online
 fetch_repository
+chown_repo_to_primary_user
 ensure_chroot_prereqs
 launch_main_installer
