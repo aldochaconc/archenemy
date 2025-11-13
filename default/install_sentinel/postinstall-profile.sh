@@ -18,6 +18,8 @@ cat <<'MSG'
 ============================================================
 Archenemy phase 1 detected. Continue with post-install setup?
 This will resume installation/boot.sh in post-install mode.
+You may want to sync the repo first:
+  cd ~/.config/archenemy && git pull
 ============================================================
 
 MSG

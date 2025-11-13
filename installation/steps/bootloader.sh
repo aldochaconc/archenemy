@@ -11,6 +11,108 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../common.sh"
 #       necessary before driver and kernel module installations occur.
 #
 
+_detect_boot_mode() {
+  if [[ -d /sys/firmware/efi ]]; then
+    echo "efi"
+  else
+    echo "bios"
+  fi
+}
+
+_find_esp_mountpoint() {
+  local candidates=("/boot/efi" "/efi" "/boot")
+  for path in "${candidates[@]}"; do
+    if mountpoint -q "$path"; then
+      echo "$path"
+      return 0
+    fi
+  done
+  log_warn "ESP mountpoint not detected; defaulting to /boot."
+  echo "/boot"
+}
+
+_partition_from_mount() {
+  local mount="$1"
+  findmnt -n -o SOURCE "$mount" 2>/dev/null || true
+}
+
+_unique_bios_disks() {
+  declare -A seen=()
+  local partitions=()
+  partitions+=("$(_partition_from_mount /)")
+  partitions+=("$(_partition_from_mount /boot)")
+  partitions+=("$(_partition_from_mount /boot/efi)")
+  local part disk
+  for part in "${partitions[@]}"; do
+    [[ -z "$part" ]] && continue
+    disk="$(lsblk -no pkname "$part" 2>/dev/null)"
+    [[ -z "$disk" ]] && continue
+    seen["$disk"]=1
+  done
+  for disk in "${!seen[@]}"; do
+    echo "$disk"
+  done
+}
+
+_sanitize_kernel_cmdline() {
+  local cmdline
+  cmdline="$(tr -d '\0' </proc/cmdline 2>/dev/null || true)"
+  cmdline="$(echo "$cmdline" | sed -E 's/(^| )BOOT_IMAGE=[^ ]*//g' | sed -E 's/(^| )initrd=[^ ]*//g' | tr -s ' ' | sed 's/^ //;s/ $//')"
+  if [[ -z "$cmdline" ]]; then
+    cmdline="rw quiet loglevel=3"
+  fi
+  echo "$cmdline"
+}
+
+_write_limine_default_file() {
+  local boot_mode="$1"
+  local esp_path="$2"
+  local cmdline
+  cmdline="$(_sanitize_kernel_cmdline)"
+
+  local tmp
+  tmp="$(mktemp)"
+  cat >"$tmp" <<EOF
+TARGET_OS_NAME="Archenemy"
+ESP_PATH="$esp_path"
+KERNEL_CMDLINE[default]="$cmdline quiet splash"
+FIND_BOOTLOADERS=yes
+BOOT_ORDER="*, *fallback, Snapshots"
+MAX_SNAPSHOT_ENTRIES=5
+SNAPSHOT_FORMAT_CHOICE=5
+EOF
+  if [[ "$boot_mode" == "efi" ]]; then
+    cat >>"$tmp" <<'EOF'
+ENABLE_UKI=yes
+CUSTOM_UKI_NAME="archenemy"
+ENABLE_LIMINE_FALLBACK=yes
+EOF
+  fi
+  run_cmd sudo install -D -m 644 "$tmp" /etc/default/limine
+  rm -f "$tmp"
+}
+
+_reset_limine_conf() {
+  local tmp
+  tmp="$(mktemp)"
+  cat >"$tmp" <<'EOF'
+### Read more at https://github.com/limine-bootloader/limine/blob/trunk/CONFIG.md
+#timeout: 3
+default_entry: 1
+interface_branding: Archenemy Bootloader
+interface_branding_color: 6
+hash_mismatch_panic: no
+
+term_background: 0c0d11
+term_palette: 0c0d11;f07078;9ed072;ffd47e;7aa2f7;bb9af7;7dcfff;d7dae0
+term_palette_bright: 161821;f07078;9ed072;ffd47e;7aa2f7;bb9af7;7dcfff;f7f8fa
+term_foreground: d7dae0
+term_foreground_bright: f7f8fa
+EOF
+  run_cmd sudo install -D -m 644 "$tmp" /boot/limine.conf
+  rm -f "$tmp"
+}
+
 ################################################################################
 # CONFIGURE PLYMOUTH
 # Sets up the Plymouth theme for a graphical boot splash screen. It copies the
@@ -84,22 +186,11 @@ _configure_limine_and_snapper() {
   fi
   run_cmd sudo install -D -m 644 "$hooks_template" /etc/mkinitcpio.conf.d/archenemy_hooks.conf
 
-  # Determine Limine config path (EFI vs BIOS)
-  local limine_config
-  if [[ -f /boot/EFI/limine/limine.conf ]] || [[ -f /boot/EFI/BOOT/limine.conf ]]; then
-    if [[ -f /boot/EFI/BOOT/limine.conf ]]; then
-      limine_config="/boot/EFI/BOOT/limine.conf"
-    else
-      limine_config="/boot/EFI/limine/limine.conf"
-    fi
-  else
-    limine_config="/boot/limine/limine.conf"
-  fi
-
-  if [[ ! -f "$limine_config" ]]; then
-    log_error "Limine config not found at $limine_config. Cannot proceed."
-    return 1
-  fi
+  local boot_mode esp_path
+  boot_mode="$(_detect_boot_mode)"
+  esp_path="$(_find_esp_mountpoint)"
+  _write_limine_default_file "$boot_mode" "$esp_path"
+  _reset_limine_conf
 
   # Set up Snapper if not already configured
   if ! sudo snapper list-configs 2>/dev/null | grep -q "root"; then
@@ -125,8 +216,34 @@ _configure_limine_and_snapper() {
     run_cmd sudo mv "${remove_hook}.disabled" "$remove_hook"
   fi
 
+  log_info "Rebuilding initramfs with restored hooks..."
+  run_cmd sudo mkinitcpio -P
+
+  if [[ "$boot_mode" == "bios" ]]; then
+    local -a bios_disks=()
+    mapfile -t bios_disks < <(_unique_bios_disks)
+    if [[ ${#bios_disks[@]} -gt 0 ]]; then
+      log_info "Running limine bios-install for disks: ${bios_disks[*]}"
+      for disk in "${bios_disks[@]}"; do
+        run_cmd sudo limine bios-install "/dev/$disk"
+      done
+    else
+      log_warn "Unable to detect BIOS target disks; limine bios-install skipped."
+    fi
+  fi
+
   log_info "Updating Limine configuration..."
   run_cmd sudo limine-update
+
+  _enable_service "limine-snapper-sync.service"
+  if [[ "${ARCHENEMY_CHROOT_INSTALL:-false}" == false ]]; then
+    run_cmd sudo systemctl start limine-snapper-sync.service
+  fi
+
+  local windows_boot="${esp_path}/EFI/Microsoft/Boot/bootmgfw.efi"
+  if [[ -f "$windows_boot" ]]; then
+    log_info "Detected Windows Boot Manager at $windows_boot; Limine will expose it via FIND_BOOTLOADERS."
+  fi
 }
 
 ################################################################################

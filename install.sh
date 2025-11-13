@@ -7,7 +7,7 @@
 # designed to be downloaded and executed via curl.
 #
 # Responsibilities:
-#   1. Detect whether we are running from the live ISO or an installed system
+#   1. Detect whether the script runs from the live ISO or an installed system
 #   2. Fetch the repository (git when available, tarball fallback otherwise)
 #   3. Execute installation/boot.sh from the correct context (directly or via
 #      arch-chroot when running from the live media)
@@ -122,12 +122,11 @@ configure_archenemy_paths() {
 
   if [[ "$RUN_IN_CHROOT" == true ]]; then
     case "$ARCHENEMY_PATH" in
-      "$ARCHENEMY_TARGET_ROOT"*)
-        ;;
-      *)
-        log_error "ARCHENEMY_PATH ($ARCHENEMY_PATH) must reside inside ARCHENEMY_TARGET_ROOT ($ARCHENEMY_TARGET_ROOT)."
-        exit 1
-        ;;
+    "$ARCHENEMY_TARGET_ROOT"*) ;;
+    *)
+      log_error "ARCHENEMY_PATH ($ARCHENEMY_PATH) must reside inside ARCHENEMY_TARGET_ROOT ($ARCHENEMY_TARGET_ROOT)."
+      exit 1
+      ;;
     esac
     ARCHENEMY_PATH_IN_CHROOT="${ARCHENEMY_PATH#"$ARCHENEMY_TARGET_ROOT"}"
     [[ "$ARCHENEMY_PATH_IN_CHROOT" == /* ]] || ARCHENEMY_PATH_IN_CHROOT="/$ARCHENEMY_PATH_IN_CHROOT"
@@ -139,6 +138,24 @@ configure_archenemy_paths() {
   fi
 
   export ARCHENEMY_USER_NAME="$ARCHENEMY_PRIMARY_USER"
+}
+
+# Persisting the detected user data lets every subsequent phase reuse the same
+# identity. Without this, reruns after a failed postinstall could guess the
+# wrong user and clobber ownership, making recovery painful.
+persist_primary_user_metadata() {
+  local state_root env_file
+  state_root="${ARCHENEMY_TARGET_ROOT:-/}/var/lib/archenemy"
+  env_file="$state_root/primary-user.env"
+
+  install -d -m 755 "$state_root"
+  cat >"$env_file" <<EOF
+ARCHENEMY_PRIMARY_USER="$ARCHENEMY_PRIMARY_USER"
+ARCHENEMY_PRIMARY_UID="$ARCHENEMY_PRIMARY_UID"
+ARCHENEMY_PRIMARY_GID="$ARCHENEMY_PRIMARY_GID"
+ARCHENEMY_PRIMARY_HOME="$ARCHENEMY_PRIMARY_HOME"
+ARCHENEMY_PRIMARY_HOME_HOST="$ARCHENEMY_PRIMARY_HOME_HOST"
+EOF
 }
 
 chown_repo_to_primary_user() {
@@ -266,6 +283,7 @@ setup_install_context
 detect_primary_user
 resolve_user_home_paths
 configure_archenemy_paths
+persist_primary_user_metadata
 require_online
 fetch_repository
 chown_repo_to_primary_user

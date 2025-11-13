@@ -82,16 +82,35 @@ archenemy_initialize_phase
 # -----------------------------------------------------------------------------
 run_phase_preinstall() {
   log_info "Phase 1 (preinstall) starting..."
-  # Step 1
+
+  # Phase 1 performs every mutation that can run from within the chroot so the
+  # rebooted system already has Limine, Hyprland, and dotfiles in place.
   source "./steps/base_system.sh"
   run_setup_base_system
 
-  # Step 3 (networking, drivers)
+  # Hardware drivers and networking
   source "./steps/drivers.sh"
   run_setup_drivers
 
+  # Bootloader + display stack
+  source "./steps/bootloader.sh"
+  run_setup_bootloader
+
+  # Graphics + dotfiles so Hyprland is ready post reboot
+  source "./steps/graphics.sh"
+  run_setup_graphics
+
+  source "./steps/dotfiles.sh"
+  run_setup_dotfiles
+
   display_phase1_completion_message
-  run_cmd "$BOOT_DIR/install-sentinel" register
+  if [[ "$ARCHENEMY_CHROOT_INSTALL" == true ]]; then
+    log_info "Phase 1 completed inside chroot; registering postinstall sentinel so the resume prompt is available after reboot."
+    # The sentinel keeps the login hook armed until phase 2 exits cleanly.
+    run_cmd "$BOOT_DIR/install-sentinel" register
+  else
+    log_info "Already running on the installed system; skipping sentinel registration so reruns stay unobtrusive."
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -102,18 +121,8 @@ run_phase_preinstall() {
 run_phase_postinstall() {
   log_info "Phase 2 (postinstall) starting..."
 
-  source "./steps/base_system.sh"
-  run_setup_base_system
-
-  source "./steps/bootloader.sh"
-  run_setup_bootloader
-
-  source "./steps/graphics.sh"
-  run_setup_graphics
-
-  source "./steps/dotfiles.sh"
-  run_setup_dotfiles
-
+  # Postinstall is deliberately narrow: only enable services/cleanup once the
+  # system is booted natively (terminal session) so recovery stays manageable.
   source "./steps/daemons.sh"
   run_setup_daemons
 

@@ -31,7 +31,7 @@ export ARCHENEMY_DEFAULTS_DIR="${ARCHENEMY_PATH}/default"
 export ARCHENEMY_DEFAULTS_BASE_SYSTEM_DIR="${ARCHENEMY_DEFAULTS_DIR}/base_system"
 export ARCHENEMY_DEFAULTS_BOOTLOADER_DIR="${ARCHENEMY_DEFAULTS_DIR}/bootloader"
 export ARCHENEMY_DEFAULTS_DRIVERS_DIR="${ARCHENEMY_DEFAULTS_DIR}/drivers"
-export ARCHENEMY_DEFAULTS_GRAPHICS_DIR="${ARCHENEMY_DEFAULTS_DIR}/graphics"
+export ARCHENEMY_DEFAULTS_GRAPHICS_DIR="${ARCHENEMY_DEFAULTS_DIR}/config"
 export ARCHENEMY_DEFAULTS_DOTFILES_DIR="${ARCHENEMY_DEFAULTS_DIR}/dotfiles"
 export ARCHENEMY_DEFAULTS_DAEMONS_DIR="${ARCHENEMY_DEFAULTS_DIR}/daemons"
 export ARCHENEMY_DEFAULTS_CLEANUP_DIR="${ARCHENEMY_DEFAULTS_DIR}/cleanup"
@@ -90,8 +90,9 @@ display_phase1_completion_message() {
   local completion_banner='
 
 ============================================================
-Phase 1 complete. Reboot into the installed system, log in,
-and run the installer again to continue with phase 2.
+Phase 1 complete. Reboot into the installed system, log in
+on a terminal (TTY), and rerun the installer to finish the
+service activation + cleanup phase.
 ============================================================
 
 '
@@ -137,6 +138,14 @@ run_cmd() {
   else
     "$@"
   fi
+}
+
+# Helpers that intentionally hit the package manager without installing so
+# manifests are validated ahead of time. Keeping this separate from run_cmd
+# avoids spamming [DRY RUN] logs and makes failures obvious.
+run_query_cmd() {
+  log_info "[QUERY] $*"
+  "$@"
 }
 
 ################################################################################
