@@ -1,5 +1,8 @@
-#!/bin/zsh
+#!/usr/bin/env zsh
+# shellcheck shell=bash disable=SC2296,SC2086
+#
 # ZLE key bindings and completion styles equivalent to readline/inputrc
+# Note: This file uses ZSH-specific syntax for parameter expansion
 
 # Enable multibyte (UTF-8) and emacs-style keybindings
 setopt MULTIBYTE
@@ -20,7 +23,7 @@ setopt AUTO_PARAM_SLASH        # append trailing / when completing directories
 setopt LIST_TYPES              # show file type indicators like ls -F
 
 # Use LS_COLORS for colored completion lists
-zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 
 # History search with arrow keys (prefix-based)
 bindkey '^[[A' history-search-backward
@@ -32,6 +35,6 @@ bindkey '^[[D' backward-char
 zstyle ':completion:*' special-dirs false
 
 # Ask before showing very large completion lists (similar to completion-query-items)
-LISTMAX=200
+export LISTMAX=200
 
 

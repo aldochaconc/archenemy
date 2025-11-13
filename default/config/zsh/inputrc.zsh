@@ -1,3 +1,9 @@
+#!/usr/bin/env zsh
+# shellcheck shell=bash disable=SC2296,SC2086
+#
+# Readline-style input configuration
+# Note: These are readline commands, not ZSH-specific
+
 set meta-flag on
 set input-meta on
 set output-meta on
