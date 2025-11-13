@@ -37,21 +37,17 @@ The project is named `archenemy` (all lowercase).
 
 ### Quick Start
 
-1. Boot the live ISO, partition/mount `/mnt`, and (optionally) bind `/mnt/var/cache/pacman/pkg` to avoid running out of space while `archinstall` downloads packages.
-2. Run `archinstall` (or your manual base install) but **do not reboot yet**. Inside the live environment/chroot run phase 1 (steps 1 & 3: base system + drivers/networking):
+1. Boot the live ISO, partition/mount `/mnt`, and, if needed, bind `/mnt/var/cache/pacman/pkg` to a larger disk/USB before running `archinstall`. If you are using the bundled QEMU harness (`archenemy-vm/Makefile`), run `make iso`, `make disks`, and `make run-live` to boot the VM with two virtio drives (`archenemy-vm.qcow2` for the OS, `archenemy-vm-data.qcow2` for extra storage). Override `PRIMARY_DISK_SIZE` / `DATA_DISK_SIZE` on the make command if you need different capacities.
+2. Run `archinstall` (or your manual base install) but **do not reboot yet**. When the installer shows “Installation completed”, choose **Exit archinstall** to return to the same live-shell session (the target root remains mounted at `/mnt`). From that shell execute phase 1:
    ```bash
-   ARCHENEMY_PHASE=preinstall sh -c 'curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash'
+   sh -c 'curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash'
    ```
-   Phase 1 covers pacman/GPG/sudo, copies defaults that are safe during chroot, and leaves a sentinel so phase 2 knows you already completed this stage.
-3. Reboot into the newly installed system (boot from disk). Log in as your user; the first interactive TTY session will prompt you to continue phase 2 automatically. Accept the prompt (or run the command manually) to execute phase 2 (steps 2, 4–8: bootloader, graphics, dotfiles, daemons, cleanup, reboot):
-   ```bash
-   ARCHENEMY_PHASE=postinstall sh -c 'curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/main/install.sh | bash'
-   ```
-   This completes the remaining steps (bootloader, drivers, graphics, daemons, cleanup, reboot) with systemd fully active.
+   No environment variables are required—the script detects the live ISO automatically, refuses to continue if `/mnt/etc/arch-release` is missing, and then re-enters the mounted system via `arch-chroot` so every `pacman` call writes to disk instead of the RAM-backed ISO. Override the mount point with `ARCHENEMY_TARGET_ROOT=/custom/mount` only if you mounted the target somewhere other than `/mnt`. Phase 1 now performs all system-shaping work (pacman/GPG/sudo, package manifests, drivers, Limine/Plymouth/SDDM, Hyprland, dotfiles) and only leaves daemon activation + cleanup for the post-reboot terminal session. When Phase 1 exits it registers a sentinel under `$ARCHENEMY_ARCHINSTALL_DIR` and drops `/etc/profile.d/archenemy-postinstall.sh` so the next boot prompts you to continue.
+3. Reboot into the newly installed system (boot from disk). Log in on a **terminal (TTY)**; the profile hook detects the sentinel and asks if you want to resume phase 2. Accept the prompt (or rerun the same `curl … install.sh | bash` command manually—or simply `~/.config/archenemy/installation/boot.sh` after a `git pull`) to run the remaining service/cleanup tasks. The sentinel is removed only after Phase 2 exits with status 0, so if something fails you can fix the repo, rerun `boot.sh`, and continue without reinstalling the base OS.
 
 Every run logs to `/var/log/archenemy-install.log`. Use `tail -f` or the VM harness (`make logs`) to inspect failures and resume.
 
-> `ARCHENEMY_PHASE` defaults to `postinstall`, so running the installer on a fully booted system needs no extra flags. Set `ARCHENEMY_PHASE=preinstall` explicitly when executing from the ISO/chroot.
+> `installation/boot.sh` automatically detects whether it is running from the live ISO/chroot (phase 1), a sentinel-guarded reboot (phase 2), or a fully configured system. Export `ARCHENEMY_PHASE=preinstall|postinstall` only when you need to override the detection manually.
 
 ### Orchestrator: `installation/boot.sh`
 
@@ -63,6 +59,8 @@ Primary entry point once `install.sh` clones the repository. It exports the shar
 - Set strict error handling (`set -euo pipefail`) and register `_handle_error`
 - Source `installation/common.sh` to expose helpers/loggers to the rest of the run
 - Source every script under `installation/steps/` and execute them in order (System Preparation → Bootloader → Drivers → Software → User Customization → Daemons → Cleanup → Reboot)
+- Auto-detect whether it is running from the live ISO/chroot or the installed system (unless `ARCHENEMY_PHASE` is explicitly set) so operators are never asked to set phases manually
+- Delegate sentinel registration/removal to `installation/install-sentinel` so phase transitions remain auditable and modular
 
 ### Common Library: `installation/common.sh`
 
@@ -70,10 +68,11 @@ Single shared shell library imported by `boot.sh` and every step script.
 
 **Responsibilities**:
 
-- Export canonical directories (`ARCHENEMY_DEFAULTS_DIR`, `ARCHENEMY_USER_DOTFILES_DIR`, `ARCHENEMY_INSTALL_FILES_DIR`) and CLI toggles (dry-run)
+- Export canonical directories (`ARCHENEMY_DEFAULTS_DIR`, `ARCHENEMY_ARCHINSTALL_DIR`, `ARCHENEMY_USER_DOTFILES_DIR`, `ARCHENEMY_INSTALL_FILES_DIR`) and CLI toggles (dry-run)
 - Provide `parse_cli_args`, `run_cmd`, and colorized logging helpers that stream to stdout and append to `ARCHENEMY_INSTALL_LOG_FILE` (defaults to `/var/log/archenemy-install.log`)
 - Offer thin wrappers for package installs (`_install_pacman_packages`, `_install_aur_packages`) and service management (`_enable_service`)
 - Expose `_display_splash` so both the installer and post-install helpers can re-use the ANSI splash screen
+- Provide orchestrator helpers (`ensure_install_log_file`, `archenemy_detect_phase`, `archenemy_initialize_phase`, `display_phase1_completion_message`) that keep `boot.sh` focused solely on sequencing
 
 Because every step sources this file via a relative path, shellcheck can follow function calls throughout the tree and canonical paths stay consistent.
 
@@ -105,10 +104,38 @@ Each step sources `installation/common.sh` so these variables and the shared log
 
 Each step is a self-contained script with a single entry point function (`run_setup_*`). Steps are executed sequentially by the orchestrator and must source `installation/common.sh` so the path variables and logging helpers remain consistent.
 
-Repository defaults are now grouped per step (`default/base_system`, `default/bootloader`, `default/graphics`, `default/dotfiles`, `default/daemons`, etc.). Each step copies only the directories it owns (e.g., Step 4 consumes `default/graphics/{hypr,waybar,mako,...}`, Step 5 reads `default/dotfiles/*`, Step 6 pulls timers from `default/daemons/systemd/user`), so there are no cross-step interdependencies and `default/dotfiles` remains the user blueprint.
+Repository defaults are now grouped per step (`default/base_system`, `default/bootloader`, `default/config`, `default/dotfiles`, `default/daemons`, etc.). Each step copies only the directories it owns (e.g., Step 4 consumes `default/config/{hypr,waybar,mako,...}`, Step 5 reads `default/dotfiles/*`, Step 6 pulls timers from `default/daemons/systemd/user`), so there are no cross-step interdependencies and `default/dotfiles` remains the user blueprint. Sentinel templates live under `default/install_sentinel` and are only consumed by `installation/install-sentinel`.
 
 > **Online Install Guard**  
 > `install.sh` and `installation/boot.sh` now verify internet connectivity (ping/curl against Arch mirrors) before proceeding, matching the Arch Linux installation guide requirement for online installs and preventing mid-run failures (e.g., the ipinfo curl in the drivers step).
+
+### Login Sentinel: `installation/install-sentinel`
+
+Phase transitions are coordinated by a dedicated helper instead of inline heredocs:
+
+- Stores the sentinel flag inside `ARCHENEMY_ARCHINSTALL_DIR` (defaults to `$ARCHENEMY_PATH/archinstall`) so all archinstall-derived artifacts live under a single, auditable tree.
+- Renders `/etc/profile.d/archenemy-postinstall.sh` from `default/install_sentinel/postinstall-profile.sh`, substituting literal paths for the sentinel and for `installation/boot.sh`. This keeps the profile hook reviewable and avoids runtime heredocs.
+- Exposes `register` and `remove` subcommands (plus `--dry-run`) so scripts and operators can manage the sentinel explicitly: phase 1 calls `register`, phase 2 calls `remove`, and the login hook also removes the sentinel on successful completion.
+- Automatically deletes the profile snippet and prunes the state directory when no longer needed, ensuring the system returns to a clean state after post-install succeeds.
+
+Because the helper uses the same logging, dry-run, and path exports as the rest of the installer, its actions appear in `/var/log/archenemy-install.log` and can be shellchecked alongside other scripts.
+
+---
+
+### QEMU Bootstrap Helper
+
+For development on the local QEMU harness (`archenemy-vm/Makefile`), use `archenemy-vm/bootstrap-vm.sh` instead of the production `install.sh`. The helper:
+
+- Mounts the optional virtio-9p pacman cache (provided when running `make run USE_CACHE=1`) so downloads persist between VM sessions.
+- Reuses the standard bootstrap sequence (install git, clone the repo, execute `installation/boot.sh`) without modifying the production installer tree.
+
+Inside the VM run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aldochaconc/archenemy/dev/archenemy-vm/bootstrap-vm.sh | bash
+```
+
+Override `CUSTOM_REPO`, `CUSTOM_REF`, or the cache-related variables as needed for branch testing.
 
 ---
 
@@ -118,7 +145,7 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 **File**: `installation/steps/base_system.sh`  
 **Entry Point**: `run_setup_base_system()`
 
-**Description**: Configures pacman (including dynamic mirror ranking via `reflector` and resilient pacman flags), system GPG, temporary sudo rules, and developer toolchains so subsequent steps can run unattended.
+**Description**: Configures pacman (installs repo-provided configs and a curated HTTPS mirror list), system GPG, temporary sudo rules, and developer toolchains so subsequent steps can run unattended.
 
 **Requirements**:
 
@@ -126,12 +153,11 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 - Repository defaults under `$ARCHENEMY_DEFAULTS_DIR`
 - Internet connectivity for package syncs
 
-**TODO**: Installs repo-provided pacman configs, installs `reflector`, ranks HTTPS mirrors, applies system GPG defaults, grants passwordless sudo via installer templates, disables mkinitcpio hooks to avoid repeated rebuilds, installs `base-devel`, and builds the `yay` AUR helper.
+**TODO**: Installs repo-provided pacman configs/mirrorlist, applies system GPG defaults, grants passwordless sudo via installer templates, disables mkinitcpio hooks to avoid repeated rebuilds, installs `base-devel`, and builds the `yay` AUR helper.
 
 **Functions**:
 
-- `_configure_pacman()`: Installs pacman.conf and mirrorlist from `$ARCHENEMY_DEFAULTS_DIR/pacman`, installs `reflector`, calls `_refresh_pacman_mirrorlist`, then runs `sudo pacman -Syyu --disable-download-timeout`
-- `_refresh_pacman_mirrorlist()`: Uses `reflector` to select the fastest HTTPS mirrors, falling back to the bundled mirrorlist if ranking fails
+- `_configure_pacman()`: Installs pacman.conf and the curated mirrorlist from `$ARCHENEMY_DEFAULTS_DIR/pacman`, then runs `sudo pacman -Syyu --disable-download-timeout`
 - `_configure_system_gpg()`: Deploys the repo `dirmngr.conf` to `/etc/gnupg`
 - `_setup_first_run_privileges()`: Renders `/etc/sudoers.d/archenemy-first-run` using `$ARCHENEMY_INSTALL_FILES_DIR/sudoers/archenemy-first-run`
 - `_configure_sudo_policy()`: Applies persistent sudo policy tweaks (e.g., `passwd_tries=10`)
@@ -147,7 +173,7 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 **File**: `installation/steps/bootloader.sh`  
 **Entry Point**: `run_setup_bootloader()`
 
-**Description**: Sets up Plymouth, SDDM autologin, Limine, and Snapper, and re-enables mkinitcpio hooks in preparation for driver installs.
+**Description**: Sets up Plymouth, SDDM autologin, Limine, and Snapper. The Limine step now rewrites `/etc/default/limine` with multi-disk/dual-boot settings, reinstalls EFI/BIOS assets, enables UKI + fallback entries when running under UEFI, and re-enables mkinitcpio hooks in preparation for driver installs.
 
 **Requirements**:
 
@@ -161,7 +187,7 @@ Repository defaults are now grouped per step (`default/base_system`, `default/bo
 
 - `_configure_plymouth()`: Installs Plymouth, copies the theme to `/usr/share/plymouth/themes/archenemy`, and sets it active
 - `_configure_desktop_display_manager()`: Installs SDDM, renders `/etc/sddm.conf.d/autologin.conf`, enables `sddm.service`
-- `_configure_limine_and_snapper()`: Installs Limine/Snapper, deploys mkinitcpio config fragments, finds the Limine config path (EFI/BIOS), creates Snapper configs for `/` and `/home`, adjusts retention, re-enables mkinitcpio hooks, updates Limine
+- `_configure_limine_and_snapper()`: Installs Limine/Snapper, deploys mkinitcpio config fragments, creates Snapper configs for `/` and `/home`, adjusts retention, re-enables mkinitcpio hooks, rebuilds initramfs, writes `/etc/default/limine` (with `FIND_BOOTLOADERS=yes` so Windows and other EFI bootloaders are surfaced automatically), refreshes `/boot/limine.conf`, runs `limine bios-install` on every detected BIOS disk, enables `limine-snapper-sync.service`, and finally runs `limine-update`
 
 ---
 
@@ -199,7 +225,7 @@ Supporting helpers: `_get_kernel()`, `_get_kernel_headers()`, `_has_gpu()`, `_ha
 **File**: `installation/steps/graphics.sh`  
 **Entry Point**: `run_setup_graphics()`
 
-**Description**: Installs the Hyprland ecosystem (based on the official Hyprland docs and the Omarchy reference), copies the structural configs shipped under `default/graphics/{hypr,waybar,mako,walker,fcitx5,uwsm,backgrounds,fontconfig,chromium,...}` into `~/.config`, syncs the Hyprland keyboard layout with `/etc/vconsole.conf`, and configures the remaining UI assets (fonts, icons, GTK/GNOME defaults, MIME handlers, keyring) so the desktop boots with a complete baseline experience.
+**Description**: Installs the Hyprland ecosystem (based on the official Hyprland docs and the Omarchy reference), copies the structural configs shipped under `default/config/{hypr,waybar,mako,walker,fcitx5,uwsm,backgrounds,fontconfig,chromium,...}` into `~/.config`, syncs the Hyprland keyboard layout with `/etc/vconsole.conf`, and configures the remaining UI assets (fonts, icons, GTK/GNOME defaults, MIME handlers, keyring) so the desktop boots with a complete baseline experience.
 
 **Requirements**:
 
@@ -209,14 +235,14 @@ Supporting helpers: `_get_kernel()`, `_get_kernel_headers()`, `_has_gpu()`, `_ha
 
 **TODO**:
 
-- `_install_hyprland_stack()`: Installs Hyprland, hyprlock, hypridle, screenshot helpers, and deploys `default/graphics/hypr`
-- `_install_session_management()`: Installs `uwsm` and copies `default/graphics/uwsm`
-- `_install_waybar_stack()`: Installs Waybar and copies `default/graphics/waybar`
-- `_install_notifications_stack()`: Installs mako + SwayOSD (libnotify, brightnessctl) and copies `default/graphics/{mako,swayosd}`
-- `_install_input_method_configs()`: Installs fcitx5 packages and copies `default/graphics/fcitx5` + `default/graphics/environment.d`
-- `_install_elephant_suite()`: Installs walker/elephant AUR helpers and copies `default/graphics/{elephant,walker}`
-- `_install_visual_assets()`: Copies `default/graphics/{backgrounds,fontconfig}`, re-linking the default wallpaper
-- `_configure_browser_defaults()`: Installs Chromium and copies `default/graphics/chromium*` plus `default/graphics/icons.theme`
+- `_install_hyprland_stack()`: Installs Hyprland, hyprlock, hypridle, screenshot helpers, and deploys `default/config/hypr`
+- `_install_session_management()`: Installs `uwsm` and copies `default/config/uwsm`
+- `_install_waybar_stack()`: Installs Waybar and copies `default/config/waybar`
+- `_install_notifications_stack()`: Installs mako + SwayOSD (libnotify, brightnessctl) and copies `default/config/{mako,swayosd}`
+- `_install_input_method_configs()`: Installs fcitx5 packages and copies `default/config/fcitx5` + `default/config/environment.d`
+- `_install_elephant_suite()`: Installs walker/elephant AUR helpers and copies `default/config/{elephant,walker}`
+- `_install_visual_assets()`: Copies `default/config/{backgrounds,fontconfig}`, re-linking the default wallpaper
+- `_configure_browser_defaults()`: Installs Chromium and copies `default/config/chromium*` plus `default/config/icons.theme`
 - `_sync_hypr_keyboard_layout()`: Mirrors `/etc/vconsole.conf` (`XKBLAYOUT`) into `~/.config/hypr/hyprland.conf`
 - `_install_fonts()` / `_install_icons()`: Installs bundled fonts/icons (FiraCode, Noto, repo icons)
 - `_configure_gtk_gnome_defaults()`: Installs GTK themes plus GNOME fallback apps (nautilus, gnome-text-editor) and applies gsettings
@@ -256,14 +282,14 @@ Supporting helpers: `_get_kernel()`, `_get_kernel_headers()`, `_has_gpu()`, `_ha
 **File**: `installation/steps/daemons.sh`  
 **Entry Point**: `run_setup_daemons()`
 
-**Description**: Finalizes core daemons: UFW firewall (now including SSH allowances), systemd-resolved DNS, OpenSSH server provisioning, power profiles, and user-level monitors that must exist before the desktop session starts.
+**Description**: Finalizes core daemons: UFW firewall (now including SSH allowances), systemd-resolved DNS, OpenSSH server provisioning, power profiles, and user-level monitors that must exist before the desktop session starts. This step also installs the Apple device stack (`libimobiledevice`, `usbmuxd`, `ifuse`, `gvfs-afc`) so iOS devices can be paired/mounted out of the box.
 
 **Requirements**:
 
 - Packages (`ufw`, `ufw-docker`, `power-profiles-daemon`) installable
 - sudo privileges
 
-**TODO**: Installs/configures UFW (with Docker + SSH allowances), links `/etc/resolv.conf` to the stub resolver, installs and enables OpenSSH for remote access (used by the VM harness), sets balanced/performance profiles via `powerprofilesctl`, deploys the bundled battery monitor systemd units into the user daemon tree, and applies structural system service tweaks such as faster shutdown timeouts.
+**TODO**: Installs/configures UFW (with Docker + SSH allowances), links `/etc/resolv.conf` to the stub resolver, installs and enables OpenSSH for remote access (used by the VM harness), sets balanced/performance profiles via `powerprofilesctl`, deploys the bundled battery monitor systemd units into the user daemon tree, installs the libimobiledevice/usbmuxd/ifuse/gvfs-afc stack for iOS device support, and applies structural system service tweaks such as faster shutdown timeouts.
 
 **Functions**:
 

@@ -27,6 +27,21 @@ ISO_PATH           := $(WORKDIR)/archlinux.iso
 DISK_SIZE          ?= 80G
 DISK_PATH          := $(WORKDIR)/$(VM_NAME).qcow2
 
+UEFI               ?= 1
+OVMF_DIR           ?= /usr/share/ovmf/x64
+OVMF_CODE_CANDIDATES := \
+	$(OVMF_DIR)/OVMF_CODE.fd \
+	$(OVMF_DIR)/OVMF_CODE.4m.fd \
+	$(OVMF_DIR)/OVMF_CODE.secboot.4m.fd
+OVMF_VARS_CANDIDATES := \
+	$(OVMF_DIR)/OVMF_VARS.fd \
+	$(OVMF_DIR)/OVMF_VARS.4m.fd
+OVMF_CODE_DEFAULT := $(firstword $(wildcard $(OVMF_CODE_CANDIDATES)))
+OVMF_VARS_DEFAULT := $(firstword $(wildcard $(OVMF_VARS_CANDIDATES)))
+OVMF_CODE_PATH     ?= $(OVMF_CODE_DEFAULT)
+OVMF_VARS_TEMPLATE ?= $(OVMF_VARS_DEFAULT)
+OVMF_VARS_PATH     := $(WORKDIR)/OVMF_VARS.fd
+
 RAM_MB             ?= 4096
 CPUS               ?= 4
 SSH_PORT           ?= 2222
@@ -53,6 +68,16 @@ QEMU_COMMON_FLAGS = \
 QEMU_DISK_FLAGS = \
 	-drive if=virtio,format=qcow2,file=$(DISK_PATH)
 
+FIRMWARE_DEPS :=
+QEMU_FIRMWARE_FLAGS :=
+
+ifeq ($(UEFI),1)
+FIRMWARE_DEPS += $(OVMF_VARS_PATH)
+QEMU_FIRMWARE_FLAGS = \
+	-drive if=pflash,format=raw,readonly=on,file=$(OVMF_CODE_PATH) \
+	-drive if=pflash,format=raw,file=$(OVMF_VARS_PATH)
+endif
+
 .PHONY: all iso disks run-live run-disk ssh test-script clean help
 
 all: help
@@ -70,23 +95,55 @@ iso: $(WORKDIR)
 		echo "[INFO] ISO already exists at $(ISO_PATH). Skipping download."; \
 	fi
 
-disks: $(WORKDIR)
-	@echo "[INFO] Creating disk ($(DISK_SIZE)) at $(DISK_PATH)"
-	qemu-img create -f qcow2 "$(DISK_PATH)" $(DISK_SIZE)
-	@echo "[DONE] Disks created."
+disks: $(DISK_PATH)
 
-run-live: iso disks
+$(DISK_PATH): $(WORKDIR)
+	@if [ -f "$(DISK_PATH)" ]; then \
+		echo "[INFO] Disk already exists at $(DISK_PATH). Skipping creation."; \
+	else \
+		echo "[INFO] Creating disk ($(DISK_SIZE)) at $(DISK_PATH)"; \
+		qemu-img create -f qcow2 "$(DISK_PATH)" $(DISK_SIZE); \
+		echo "[DONE] Disk ready."; \
+	fi
+
+ifeq ($(UEFI),1)
+$(OVMF_VARS_PATH): $(WORKDIR)
+	@if [ -z "$(OVMF_CODE_PATH)" ]; then \
+		echo "[ERROR] Unable to locate a default OVMF_CODE image under $(OVMF_DIR). Install 'edk2-ovmf' or set OVMF_CODE_PATH=/path/to/OVMF_CODE.fd."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(OVMF_CODE_PATH)" ]; then \
+		echo "[ERROR] OVMF_CODE not found at $(OVMF_CODE_PATH). Install 'edk2-ovmf' or override OVMF_CODE_PATH."; \
+		exit 1; \
+	fi
+	@if [ -z "$(OVMF_VARS_TEMPLATE)" ]; then \
+		echo "[ERROR] Unable to locate a default OVMF_VARS template under $(OVMF_DIR). Install 'edk2-ovmf' or set OVMF_VARS_TEMPLATE=/path/to/OVMF_VARS.fd."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(OVMF_VARS_TEMPLATE)" ]; then \
+		echo "[ERROR] Missing OVMF_VARS template at $(OVMF_VARS_TEMPLATE). Install 'edk2-ovmf' or override OVMF_VARS_TEMPLATE."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(OVMF_VARS_PATH)" ]; then \
+		echo "[INFO] Initializing UEFI variable store at $(OVMF_VARS_PATH)"; \
+		cp "$(OVMF_VARS_TEMPLATE)" "$(OVMF_VARS_PATH)"; \
+	else \
+		echo "[INFO] UEFI variable store already exists at $(OVMF_VARS_PATH)."; \
+	fi
+endif
+
+run-live: iso $(DISK_PATH) $(FIRMWARE_DEPS)
 	@if [ ! -f "$(ISO_PATH)" ]; then echo "Missing ISO. Run 'make iso'."; exit 1; fi
 	@echo "[INFO] Booting from ISO..."
-	$(QEMU_BIN) $(QEMU_COMMON_FLAGS) \
+	$(QEMU_BIN) $(QEMU_COMMON_FLAGS) $(QEMU_FIRMWARE_FLAGS) \
 		$(QEMU_DISK_FLAGS) \
 		-cdrom "$(ISO_PATH)" \
 		-boot order=d
 
-run-disk: disks
+run-disk: $(DISK_PATH) $(FIRMWARE_DEPS)
 	@if [ ! -f "$(DISK_PATH)" ]; then echo "Missing disk. Run 'make disks'."; exit 1; fi
 	@echo "[INFO] Booting from disk..."
-	$(QEMU_BIN) $(QEMU_COMMON_FLAGS) \
+	$(QEMU_BIN) $(QEMU_COMMON_FLAGS) $(QEMU_FIRMWARE_FLAGS) \
 		$(QEMU_DISK_FLAGS) \
 		-boot order=c
 
@@ -100,7 +157,7 @@ test-script:
 
 clean:
 	@echo "[WARN] Removing ISO and disk ..."
-	rm -f "$(ISO_PATH)" "$(DISK_PATH)"
+	rm -f "$(ISO_PATH)" "$(DISK_PATH)" "$(OVMF_VARS_PATH)"
 	@echo "[DONE] Cleaned."
 
 help:
@@ -114,6 +171,8 @@ help:
 	@echo "make ssh         SSH into the guest (requires sshd + password in VM)"
 	@echo "make test-script Run the installer remotely via SSH (uses ARCHENEMY_INSTALL_CMD)"
 	@echo "make clean       Remove ISO and qcow2 disk"
+	@echo ""
+	@echo "UEFI firmware is enabled by default (OVMF). Override UEFI=0 to boot with legacy SeaBIOS."
 	@echo ""
 	@echo "Inside the live ISO:"
 	@echo "  1. Run archinstall but DO NOT reboot."
