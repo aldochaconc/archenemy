@@ -14,12 +14,14 @@ fi
 ARCHENEMY_COMMON_SOURCED=true
 
 # --- Canonical Paths ---------------------------------------------------------
-: "${ARCHENEMY_PATH:="$HOME/.config/archenemy"}"
+: "${ARCHENEMY_HOME:="$HOME"}"
+: "${ARCHENEMY_PATH:="$ARCHENEMY_HOME/.config/archenemy"}"
 : "${ARCHENEMY_INSTALL_ROOT:="$ARCHENEMY_PATH/installation"}"
-: "${ARCHENEMY_USER_CONFIG_DIR:="$HOME/.config"}"
+: "${ARCHENEMY_USER_CONFIG_DIR:="$ARCHENEMY_HOME/.config"}"
 : "${ARCHENEMY_USER_DOTFILES_DIR:="$ARCHENEMY_USER_CONFIG_DIR/dotfiles"}"
 : "${ARCHENEMY_ARCHINSTALL_DIR:="${ARCHENEMY_PATH}/archinstall"}"
 
+export ARCHENEMY_HOME
 export ARCHENEMY_PATH
 export ARCHENEMY_INSTALL_ROOT
 export ARCHENEMY_USER_CONFIG_DIR

@@ -221,14 +221,6 @@ _install_aur_helper() {
   fi
 }
 
-run_install_aur_helper_if_needed() {
-  if [[ "$ARCHENEMY_CHROOT_INSTALL" == true ]]; then
-    log_info "Skipping AUR helper install inside chroot; it will be installed after reboot."
-    return
-  fi
-  _install_aur_helper
-}
-
 ################################################################################
 # RUN
 ################################################################################
@@ -255,7 +247,7 @@ run_setup_base_system() {
   _install_base_packages
 
   # --- 7. Install AUR helper (yay) ---
-  run_install_aur_helper_if_needed
+  _install_aur_helper
 
   log_success "System preparation completed."
 }
