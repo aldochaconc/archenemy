@@ -1,0 +1,71 @@
+# Vim → Hyprland Keybinding Parallels
+# Archenemy keybindings inspired by Vim
+
+## NAVIGATION
+vim: hjkl                → hypr: SUPER+hjkl           (Navigate windows)
+vim: ^W h/j/k/l          → hypr: SUPER+hjkl           (Same as above)
+vim: ^W H/J/K/L          → hypr: SUPER+SHIFT+hjkl     (Swap windows)
+vim: ^W w                → hypr: SUPER+o              (Cycle windows)
+vim: gt                  → hypr: SUPER+TAB            (Next workspace/tab)
+vim: gT                  → hypr: SUPER+SHIFT+TAB      (Previous workspace/tab)
+vim: {N}gt               → hypr: SUPER+{1-9}          (Go to workspace N)
+
+## WINDOW MANAGEMENT
+vim: :q / ZZ             → hypr: SUPER+w/q            (Close window)
+vim: ^W o                → hypr: SUPER+x              (Fullscreen only)
+vim: ^W r                → hypr: SUPER+t              (Rotate/toggle split)
+vim: ^W _                → hypr: SUPER+m              (Maximize vertical)
+vim: ^W |                → hypr: SUPER+ALT+f          (Maximize horizontal/full width)
+vim: ^W s                → hypr: SUPER+t              (Split)
+vim: ^W v                → hypr: SUPER+t              (Vertical split)
+
+## COMMAND & SEARCH
+vim: /                   → hypr: SUPER+/              (Search via launcher)
+vim: :                   → hypr: SUPER+SEMICOLON      (Command mode via launcher)
+vim: n                   → hypr: SUPER+TAB            (Next match/workspace)
+vim: N                   → hypr: SUPER+SHIFT+TAB      (Previous match/workspace)
+
+## VISUAL & EDIT MODES
+vim: v                   → hypr: SUPER+v              (Visual mode → Floating)
+vim: V                   → hypr: SUPER+g              (Visual line → Group)
+vim: p                   → hypr: SUPER+p              (Put → Pin window)
+vim: y                   → hypr: SUPER+c              (Yank → Copy)
+vim: d                   → hypr: SUPER+x              (Delete → Cut)
+
+## INCREMENT & POSITIONING
+vim: ^A                  → hypr: SUPER+a              (Increment → Expand)
+vim: ^X                  → hypr: SUPER+x              (Decrement → Shrink)
+vim: zz                  → hypr: SUPER+z              (Center cursor → Center window)
+vim: zt                  → hypr: SUPER+k              (Top → Move focus up)
+vim: zb                  → hypr: SUPER+j              (Bottom → Move focus down)
+
+## UNDO & REDO
+vim: u                   → hypr: SUPER+CTRL+TAB       (Undo → Previous workspace)
+vim: ^R                  → hypr: SUPER+TAB            (Redo → Next workspace)
+
+## MARKS & JUMPS
+vim: m{a-z}              → hypr: SUPER+SHIFT+{1-9}    (Set mark → Move to workspace)
+vim: '{a-z}              → hypr: SUPER+{1-9}          (Jump to mark → Go to workspace)
+
+## BUFFERS & WINDOWS
+vim: :bn                 → hypr: SUPER+TAB            (Next buffer → Next workspace)
+vim: :bp                 → hypr: SUPER+SHIFT+TAB      (Previous buffer → Previous workspace)
+vim: :b{N}               → hypr: SUPER+{N}            (Buffer N → Workspace N)
+vim: ^W c                → hypr: SUPER+w              (Close window)
+vim: ^W q                → hypr: SUPER+q              (Quit window)
+
+## SPECIAL MODES
+vim: :only               → hypr: SUPER+x              (Only this window → Fullscreen)
+vim: :split              → hypr: SUPER+t              (Split → Toggle split)
+vim: :tabnew             → hypr: SUPER+SHIFT+{1-9}    (New tab → New workspace)
+
+## TIPS
+# Use SUPER instead of ^W for window commands
+# Use SUPER+{number} like {number}gt for workspace navigation
+# SUPER+hjkl replaces all hjkl navigation
+# SUPER+/ replaces / for searching (via launcher)
+# SUPER+SEMICOLON replaces : for command mode (via launcher)
+# Floating windows behave like visual mode selections
+# Groups behave like visual line mode
+# Pin is like putting/pasting a window on all workspaces
+

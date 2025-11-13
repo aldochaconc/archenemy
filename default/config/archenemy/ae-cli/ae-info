@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# Archenemy System Information
+# Display system and Hyprland info - Bash compatible
+set -euo pipefail
+
+if [[ -t 1 ]]; then
+  CYAN='\033[0;36m' BOLD='\033[1m' RESET='\033[0m'
+else
+  CYAN='' BOLD='' RESET=''
+fi
+
+main() {
+  echo -e "${BOLD}Archenemy System Information${RESET}\n"
+
+  echo -e "${CYAN}Hyprland:${RESET}"
+  if command -v hyprctl &>/dev/null; then
+    hyprctl version | head -3
+  else
+    echo "  Not running"
+  fi
+
+  echo -e "\n${CYAN}Display:${RESET}"
+  if command -v hyprctl &>/dev/null; then
+    hyprctl monitors | grep -E "Monitor|resolution" | head -4
+  fi
+
+  echo -e "\n${CYAN}GPU:${RESET}"
+  lspci | grep -i vga
+
+  echo -e "\n${CYAN}Memory:${RESET}"
+  free -h | grep Mem | awk '{print "  Total: " $2 " | Used: " $3 " | Free: " $4}'
+
+  echo -e "\n${CYAN}Uptime:${RESET}"
+  uptime -p
+}
+
+main "$@"

@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+#
+# Archenemy Hyprland Control
+# CLI for managing Hyprland - Bash compatible
+set -euo pipefail
+
+if [[ -t 1 ]]; then
+  RED='\033[0;31m' GREEN='\033[0;32m' CYAN='\033[0;36m' BOLD='\033[1m' RESET='\033[0m'
+else
+  RED='' GREEN='' CYAN='' BOLD='' RESET=''
+fi
+
+check_hyprland() {
+  if ! command -v hyprctl &>/dev/null; then
+    echo -e "${RED}Error:${RESET} Hyprland not running or hyprctl not found"
+    exit 1
+  fi
+}
+
+show_help() {
+  cat <<EOF
+${BOLD}ae hypr${RESET} - Hyprland Control Interface
+
+${BOLD}USAGE:${RESET}
+  ae hypr <command>
+
+${BOLD}COMMANDS:${RESET}
+  ${CYAN}reload, r${RESET}        Reload Hyprland configuration
+  ${CYAN}info, i${RESET}          Show system information
+  ${CYAN}monitors, m${RESET}      Display monitor configuration
+  ${CYAN}windows, w${RESET}       List open windows
+  ${CYAN}workspaces, ws${RESET}   Show workspace overview
+  ${CYAN}binds, k${RESET}         Display active keybindings
+  ${CYAN}rules${RESET}            Show window rules
+  ${CYAN}plugins${RESET}          List loaded plugins
+  ${CYAN}logs${RESET}             View Hyprland logs
+  ${CYAN}debug, d${RESET}         Show debug information
+EOF
+}
+
+cmd_reload() {
+  echo "Reloading Hyprland configuration..."
+  hyprctl reload
+  echo -e "${GREEN}[OK]${RESET} Configuration reloaded"
+}
+
+cmd_info() {
+  echo -e "${BOLD}System Information${RESET}"
+  hyprctl systeminfo
+}
+
+cmd_monitors() {
+  if command -v jq &>/dev/null; then
+    hyprctl monitors -j | jq -r '.[] | "[\(.id)] \(.name) - \(.width)x\(.height)@\(.refreshRate)Hz (\(.x),\(.y))"'
+  else
+    hyprctl monitors
+  fi
+}
+
+cmd_windows() {
+  if command -v jq &>/dev/null; then
+    hyprctl clients -j | jq -r '.[] | "[\(.workspace.id)] \(.class) - \(.title)"'
+  else
+    hyprctl clients
+  fi
+}
+
+cmd_workspaces() {
+  if command -v jq &>/dev/null; then
+    hyprctl workspaces -j | jq -r '.[] | "Workspace \(.id): \(.windows) windows"'
+  else
+    hyprctl workspaces
+  fi
+}
+
+cmd_binds() {
+  hyprctl binds | ${PAGER:-less}
+}
+
+cmd_rules() {
+  echo -e "${BOLD}Window Rules${RESET}"
+  grep -E "^(windowrule|windowrulev2|layerrule)" ~/.config/hypr/**/*.conf 2>/dev/null || echo "No rules found"
+}
+
+cmd_plugins() {
+  hyprctl plugins list
+}
+
+cmd_logs() {
+  local latest_dir
+  latest_dir=$(find /tmp/hypr/ -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+  local log_file="$latest_dir/hyprland.log"
+
+  if [[ -f "$log_file" ]]; then
+    tail -f "$log_file"
+  else
+    echo -e "${RED}Error:${RESET} Log file not found"
+    exit 1
+  fi
+}
+
+cmd_debug() {
+  echo -e "${BOLD}Debug Information${RESET}\n"
+  echo -e "${CYAN}Version:${RESET}"
+  hyprctl version
+  echo -e "\n${CYAN}Active Window:${RESET}"
+  hyprctl activewindow
+  echo -e "\n${CYAN}Cursor Position:${RESET}"
+  hyprctl cursorpos
+}
+
+main() {
+  check_hyprland
+
+  local cmd="${1:-}"
+  shift || true
+
+  case "$cmd" in
+  reload | r)
+    cmd_reload
+    ;;
+  info | i)
+    cmd_info
+    ;;
+  monitors | mon | m)
+    cmd_monitors
+    ;;
+  windows | win | w)
+    cmd_windows
+    ;;
+  workspaces | ws)
+    cmd_workspaces
+    ;;
+  binds | keys | k)
+    cmd_binds
+    ;;
+  rules)
+    cmd_rules
+    ;;
+  plugins | plug)
+    cmd_plugins
+    ;;
+  logs | log)
+    cmd_logs
+    ;;
+  debug | d)
+    cmd_debug
+    ;;
+  --help | -h | help | "")
+    show_help
+    ;;
+  *)
+    echo -e "${RED}Error:${RESET} Unknown command '$cmd'"
+    echo "Run ${CYAN}ae hypr --help${RESET} for usage"
+    exit 1
+    ;;
+  esac
+}
+
+main "$@"

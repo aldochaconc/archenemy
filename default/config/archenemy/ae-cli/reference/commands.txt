@@ -1,0 +1,98 @@
+# Archenemy Command Reference
+# All available commands and their usage
+
+## MAIN COMMAND
+ae                Main command center
+ae                       Short alias for ae
+
+## KEYBINDING REFERENCE
+ae keys           Show full keyboard layout
+ae keys --layer   Show specific layer (super, shift, ctrl, alt)
+ae keys --search  Interactive keybinding search
+ae keys --vim     Show vim parallels
+ae keys --cheat   Compact cheat sheet
+ae keys --live    Show live bindings from Hyprland
+ae-keys                  Alias for ae keys
+ae k                     Short form
+
+## CONFIGURATION EDITOR
+ae edit           Interactive configuration menu
+ae edit hyprland  Edit main Hyprland config
+ae edit envs      Edit environment variables
+ae edit monitors  Edit monitor configuration
+ae edit input     Edit input device settings
+ae edit looknfeel Edit appearance settings
+ae edit autostart Edit autostart applications
+ae edit windows   Edit window rules
+ae edit bindings  Edit keybindings directory
+ae edit apps      Edit app-specific rules
+ae edit waybar    Edit Waybar configuration
+ae edit mako      Edit Mako configuration
+ae edit kitty     Edit Kitty terminal config
+ae-edit                  Alias for ae edit
+ae e                     Short form
+
+## HYPRLAND CONTROL
+ae hypr reload    Reload Hyprland configuration
+ae hypr info      Show system information
+ae hypr monitors  Display monitor configuration
+ae hypr windows   List and manage windows
+ae hypr workspaces Show workspace overview
+ae hypr binds     Display all keybindings
+ae hypr rules     Show window rules
+ae hypr plugins   List loaded plugins
+ae hypr logs      View Hyprland logs
+ae hypr debug     Show debug information
+ae-hypr                  Alias for ae hypr
+ae h                     Short form
+
+## SYSTEM INFORMATION
+ae info           Show Archenemy system info
+ae-info                  Alias for ae info
+ae i                     Short form
+
+## QUICK REFERENCE
+ae ref keys       Keybinding reference
+ae ref vim        Vim parallels
+ae ref commands   This command list
+ae ref hypr       Hyprland variables
+ae ref troubleshoot Common issues and solutions
+
+## HELP & VERSION
+ae help           Show main help
+ae version        Show version information
+ae --help         Show main help
+ae --version      Show version information
+
+## SHORTCUT ALIASES
+ae                       Short for ae
+ae-keys                  Short for ae keys
+ae-edit                  Short for ae edit
+ae-hypr                  Short for ae hypr
+ae-info                  Short for ae info
+ae-conf-hypr             Edit main Hyprland config
+ae-conf-keys             Edit keybindings directory
+ae-conf-apps             Edit apps directory
+hypr-reload              Quick reload Hyprland
+hypr-info                Quick Hyprland info
+hypr-win                 List windows
+
+## USAGE EXAMPLES
+ae keys --search         # Search for a specific keybinding
+ae edit                  # Open interactive config menu
+ae hypr reload           # Reload Hyprland after config changes
+ae h info                # Show Hyprland system info
+ae ref vim               # Show vim-style keybinding parallels
+ae k --layer super       # Show only SUPER layer bindings
+ae e hyprland            # Directly edit hyprland.conf
+ae h windows             # Interactive window selector
+ae h monitors            # Show monitor configuration
+ae ref troubleshoot      # View troubleshooting guide
+
+## TIPS
+# Use tab completion for subcommands
+# Most commands have short forms (k, e, h, i)
+# Use --help with any command for detailed info
+# Commands work over SSH (text-only mode)
+# fzf, bat, and gum enhance the experience but are optional
+
