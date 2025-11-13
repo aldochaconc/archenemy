@@ -1,0 +1,126 @@
+# Core packages required across the installer and default Hyprland session.
+# - Derived from the installation steps plus the defaults in default/
+# - Limited to official repository packages (AUR helpers handle the rest)
+# - Hardware-specific GPU drivers are intentionally excluded.
+
+# Core system & bootstrapping
+base
+base-devel
+linux
+linux-headers
+linux-firmware
+btrfs-progs
+snapper
+dkms
+limine
+sbctl
+dosfstools
+mtools
+plymouth
+sddm
+# Generic networking & services (driver-agnostic)
+iwd
+wireless-regdb
+nss-mdns
+iw
+bluez
+bluez-utils
+cups
+avahi
+ufw
+openssh
+power-profiles-daemon
+ddcutil
+
+# Developer toolchain & shells
+git
+go
+gcc
+clang
+llvm
+rust
+neovim
+zsh
+zsh-completions
+starship
+mise
+zoxide
+fzf
+bat
+jq
+curl
+wget
+tar
+zip
+unzip
+7zip
+bzip2
+gzip
+xz
+
+# Terminals & TUI helpers referenced by bindings
+kitty
+alacritty
+wezterm
+foot
+tmux
+zellij
+lazygit
+lazydocker
+btop
+htop
+ranger
+lf
+
+# Hyprland session baseline
+hyprland
+hypridle
+hyprlock
+hyprpicker
+uwsm
+swaybg
+waybar
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+gtk4-layer-shell
+qt5-wayland
+qt6-wayland
+qt6-remoteobjects
+wl-clipboard
+grim
+slurp
+playerctl
+imv
+libnotify
+brightnessctl
+mako
+swayosd
+fcitx5
+fcitx5-gtk
+gnome-keyring
+polkit-gnome
+gnome-themes-extra
+chromium
+nautilus
+gnome-text-editor
+gnome-calculator
+blueberry
+
+# Audio / video plumbing
+pipewire
+pipewire-alsa
+pipewire-pulse
+pipewire-jack
+wireplumber
+gst-plugin-pipewire
+mpv
+
+# Fonts & theming
+ttf-fira-code
+ttf-cascadia-mono-nerd
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+noto-fonts-extra
+woff2-font-awesome

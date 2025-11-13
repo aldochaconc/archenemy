@@ -1,145 +1,37 @@
-alacritty
-avahi
-bash-completion
-bat
-blueberry
-brightnessctl
-btop
-rust
-clang
-cups
-cups-browsed
-cups-filters
-cups-pdf
-docker
-docker-buildx
-docker-compose
-dust
-evince
-expac
-eza
-fastfetch
-fcitx5
-fcitx5-gtk
-fcitx5-qt
-fd
-ffmpegthumbnailer
-fontconfig
-fzf
-github-cli
-gnome-calculator
-gnome-keyring
-gnome-themes-extra
-grim
-gum
-gvfs-mtp
-gvfs-nfs
-gvfs-smb
-hypridle
-hyprland
-hyprland-qtutils
-hyprlock
-hyprpicker
-hyprsunset
-imagemagick
-impala
-imv
-inetutils
-inxi
-iwd
-jq
+# Repository packages that complement the Hyprland defaults.
+# Derived from default/config/hypr/* references so keybindings, menus,
+# and helper scripts work out of the box. Keep alphabetical within sections.
+
+# Session helpers & menus
+networkmanager          # bindings/system.sh show_network_info uses nmcli
+rofi                    # fallback menu in system.sh power_menu/show_keybindings
+wofi                    # fallback menu in system.sh power_menu/show_keybindings
+
+# Screenshot, OCR, and recording helpers
+gimp                    # screenshot_edit fallback editor
+krita                   # screenshot_edit fallback editor
+satty                   # preferred editor in screenshot_edit
+swappy                  # screenshot_edit fallback editor
+tesseract               # bindings/system.sh ocr_screenshot
+wf-recorder             # bindings/system.sh toggle_screenrecord
+zbar                    # bindings/system.sh scan_qr_code (provides zbarimg)
+
+# Sharing & communications
+bitwarden               # $passwordManager in bindings/apps.conf
+gnome-calendar          # optional calendar binding
+kdeconnect              # share_menu option and kdeconnect-cli usage
+thunderbird             # share_menu email client default
+zathura                 # $pdfViewer in bindings/apps.conf
+
+# Device connectivity
+gvfs-afc                # Apple File Conduit integration for Nautilus
+ifuse                   # Mount iOS devices via FUSE
+libimobiledevice        # Core libraries for iOS device pairing
+usbmuxd                 # USB mux daemon required for iOS pairing
+
+# Media & creative applications referenced in window rules
+blender
+inkscape
 kdenlive
-kvantum-qt5
-lazydocker
-lazygit
-less
-libsecret
-libyaml
-llvm
-luarocks
-mako
-man-db
-mariadb-libs
-mise
-mpv
-nautilus
-gnome-disk-utility
-noto-fonts
-noto-fonts-cjk
-noto-fonts-emoji
-noto-fonts-extra
-nss-mdns
-neovim
-chromium
-pamixer
-playerctl
-plocate
-plymouth
-polkit-gnome
-postgresql-libs
-power-profiles-daemon
-python-gobject
-python-poetry-core
-qt5-wayland
-ripgrep
-satty
-sddm
-slurp
-starship
-sushi
-swaybg
-swayosd
-system-config-printer
-tldr
-tree-sitter-cli
-ttf-cascadia-mono-nerd
-ttf-jetbrains-mono-nerd
-ufw
-unzip
-uwsm
-waybar
-whois
-wireless-regdb
-wiremix
-wireplumber
-wl-clipboard
-woff2-font-awesome
-xdg-desktop-portal-gtk
-xdg-desktop-portal-hyprland
-xmlstarlet
-xournalpp
-zoxide
-autoconf-archive
-base
-base-devel
-broadcom-wl
-btrfs-progs
-dart
-dkms
-egl-wayland
-git
-gst-plugin-pipewire
-gtk4-layer-shell
-htop
-intltool
-jdk-openjdk
-libpulse
-libsass
-limine
-linux
-linux-firmware
-linux-headers
-pipewire
-pipewire-alsa
-pipewire-jack
-pipewire-pulse
-qt5-remoteobjects
-qt6-wayland
-sassc
-snapper
-webp-pixbuf-loader
-wget
-zram-generator
-zsh
-zsh-completions
-ttf-fira-code
+obs-studio
+vlc
