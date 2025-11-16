@@ -10,7 +10,7 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 | `installation/system.sh`       | Ready      | Main orchestrator; entry point calling `bootloader.sh`, `desktop.sh`, and the rest of the installer.     | Inline docs + lint complete; tests logged; proceed to next module.          |
 | `installation/packages/`       | Ready      | `core`, `pacman`, `aur`, `apps` lists plus the `packages.sh` script that ties them together.             | Header + manifests committed; duplicates checked.                           |
 | `installation/bootloader.*`    | Ready      | `bootloader.sh`, the `bootloader/` directory, `mkinitcpio` hooks, plymouth themes.                       | Headers + lint done; assets verified; ready for commit history.             |
-| `installation/drivers.*`       | Pending    | `drivers.sh` plus `drivers/` subfolders (GPU, input, firmware).                                          | Validate hardware detection logic and minimal package sets.                 |
+| `installation/drivers.*`       | Ready      | `drivers.sh` plus `drivers/` subfolders (GPU, input, firmware).                                          | Headers + lint done; hardware detection documented.                         |
 | `installation/desktop.*`       | Ready      | `desktop.sh`, `defaults/`, `installation/defaults/`, Hypr/graphics scripts, dotfiles.                   | Header + lint done; defaults checked; proceed to next module.               |
 | `installation/cleanup.sh`/`reboot.sh` | Pending    | Final cleanup and reboot scripts, sentinel services.                                                     | Ensure they clear logs/tmp and control final machine state.                 |
 | `defaults/`                    | Pending    | Dotfiles, assets, systemd user services, wallpapers, icons.                                              | Confirm scripts install them into the expected paths.                       |
@@ -57,6 +57,8 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 18:15 -03** Context reloaded for drivers module; `installation/drivers.sh` sources helpers (`core.sh`, `network.sh`, `intel.sh`, `amd.sh`, `nvidia.sh`). Missing module header/glossary, per-helper doc gaps in helper files, shellcheck directives should point to repo paths, and hardware detection functions need notes about dependencies (lspci, pacman, mkinitcpio). Need plan for `bash -n`/`shellcheck`; no defaults directory for drivers, so validations focus on hardware detection mocks.
 - **2025-11-16 18:16 -03** Added module header/glossary to `installation/drivers.sh` and helper scripts (`core.sh`, `network.sh`, `intel.sh`, `amd.sh`, `nvidia.sh`); updated shellcheck directives to repo paths; documented tool prerequisites per helper.
 - **2025-11-16 18:17 -03** Ran `bash -n installation/drivers.sh installation/drivers/*.sh` and `shellcheck -x installation/drivers.sh installation/drivers/*.sh` (all clean); no drivers defaults tree to validate.
+- **2025-11-16 18:18 -03** Drivers module committed (`feat(drivers): document hardware installers`).
+- **2025-11-16 18:35 -03** Added headers/glossaries to `installation/cleanup.sh` and `installation/reboot.sh`; ran `bash -n installation/cleanup.sh installation/reboot.sh` and `shellcheck -x installation/cleanup.sh installation/reboot.sh`.
 
 ## Immediate next steps
 
