@@ -12,7 +12,7 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 | `installation/bootloader.*`    | Ready      | `bootloader.sh`, the `bootloader/` directory, `mkinitcpio` hooks, plymouth themes.                       | Headers + lint done; assets verified; ready for commit history.             |
 | `installation/drivers.*`       | Ready      | `drivers.sh` plus `drivers/` subfolders (GPU, input, firmware).                                          | Headers + lint done; hardware detection documented.                         |
 | `installation/desktop.*`       | Ready      | `desktop.sh`, `defaults/`, `installation/defaults/`, Hypr/graphics scripts, dotfiles.                   | Header + lint done; defaults checked; proceed to next module.               |
-| `installation/cleanup.sh`/`reboot.sh` | Pending    | Final cleanup and reboot scripts, sentinel services.                                                     | Ensure they clear logs/tmp and control final machine state.                 |
+| `installation/cleanup.sh`/`reboot.sh` | Ready      | Final cleanup and reboot scripts, sentinel services.                                                     | Headers + lint done; ready for wrap-up.                                     |
 | `defaults/`                    | Pending    | Dotfiles, assets, systemd user services, wallpapers, icons.                                              | Confirm scripts install them into the expected paths.                       |
 
 *(Add/remove rows as progress changes; mark the Status column as `In Progress` or `Done` when applicable.)*
@@ -59,13 +59,14 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 18:17 -03** Ran `bash -n installation/drivers.sh installation/drivers/*.sh` and `shellcheck -x installation/drivers.sh installation/drivers/*.sh` (all clean); no drivers defaults tree to validate.
 - **2025-11-16 18:18 -03** Drivers module committed (`feat(drivers): document hardware installers`).
 - **2025-11-16 18:35 -03** Added headers/glossaries to `installation/cleanup.sh` and `installation/reboot.sh`; ran `bash -n installation/cleanup.sh installation/reboot.sh` and `shellcheck -x installation/cleanup.sh installation/reboot.sh`.
+- **2025-11-16 18:36 -03** Cleanup/reboot module committed (`feat(cleanup): document cleanup and reboot`).
 
 ## Immediate next steps
 
 *(This list is refreshed at the beginning of each working block; update it whenever priorities change so it always reflects the current sprint.)*
 
-1. Inventory `installation/cleanup.sh` + `installation/reboot.sh` (and sentinel scripts) for missing docs.
-2. Define lint/testing plan for cleanup/reboot (bash -n, shellcheck, verifying defaults) before editing.
+1. Inventory `defaults/` tree (apps/config/assets/systemd) for gaps vs installer scripts; decide if any need documentation or README updates.
+2. Define lint/verification plan for defaults (permissions, presence of referenced files) before editing.
 3. Keep the progress log synced after each action to avoid regressions.
 
 ## Suggestions queue
