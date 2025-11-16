@@ -9,7 +9,7 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 | `installation/commons/`        | Ready       | Shared helpers invoked from `system.sh`, `bootloader`, `drivers`, etc.                                   | Inline docs + lint complete; stage for commit after risk review.            |
 | `installation/system.sh`       | Ready      | Main orchestrator; entry point calling `bootloader.sh`, `desktop.sh`, and the rest of the installer.     | Inline docs + lint complete; tests logged; proceed to next module.          |
 | `installation/packages/`       | In Progress | `core`, `pacman`, `aur`, `apps` lists plus the `packages.sh` script that ties them together.             | Watch for duplicates and script cross dependencies.                         |
-| `installation/bootloader.*`    | Pending    | `bootloader.sh`, the `bootloader/` directory, `mkinitcpio` hooks, plymouth themes.                       | Confirm referenced assets and config paths exist.                           |
+| `installation/bootloader.*`    | Ready      | `bootloader.sh`, the `bootloader/` directory, `mkinitcpio` hooks, plymouth themes.                       | Headers + lint done; assets verified; ready for commit history.             |
 | `installation/drivers.*`       | Pending    | `drivers.sh` plus `drivers/` subfolders (GPU, input, firmware).                                          | Validate hardware detection logic and minimal package sets.                 |
 | `installation/desktop.*`       | Pending    | `desktop.sh`, `defaults/`, `installation/defaults/`, Hypr/graphics scripts, dotfiles.                   | Keep assets and installer behavior in sync.                                 |
 | `installation/cleanup.sh`/`reboot.sh` | Pending    | Final cleanup and reboot scripts, sentinel services.                                                     | Ensure they clear logs/tmp and control final machine state.                 |
@@ -45,21 +45,26 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 18:01 -03** System module committed (`feat(system): add orchestrator script`) after passing `bash -n installation/system.sh` and `shellcheck -x installation/system.sh`.
 - **2025-11-16 18:02 -03** Context reloaded for packages module; `ls installation/packages` lists `aur.package`, `pacman.package`; `packages.sh` orchestrates `_install_packages_from_manifest`.
 - **2025-11-16 18:03 -03** Added header + glossary to `installation/packages.sh`; ran `bash -n installation/packages.sh` and `shellcheck -x installation/packages.sh` (both clean). Verified `installation/packages/pacman.package` and `aur.package` have no duplicate entries via Python counters.
+- **2025-11-16 18:06 -03** Context reloaded for bootloader module; `ls installation/bootloader` shows `lib.sh`, `plymouth.sh`, `sddm.sh`, `limine.sh`; `installation/bootloader.sh` sources them and dispatches run_* functions. Missing: module header/glossary in `bootloader.sh`, docs for helpers like `archenemy_bootloader_detect_boot_mode`, `*_find_esp_mountpoint`, `*_write_limine_default_file`, plymouth/sddm installers, plus shellcheck directives pointing to repo paths.
+- **2025-11-16 18:07 -03** Bootloader plan: add headers/glossaries to `bootloader.sh` and each helper file, ensure shellcheck directives use repo paths, then run `bash -n installation/bootloader.sh installation/bootloader/*.sh` and `shellcheck -x` equivalents. Validate defaults via `ls installation/defaults/bootloader` and confirm plymouth/SDDM templates exist before committing.
+- **2025-11-16 18:08 -03** Added module headers + variable glossaries to `installation/bootloader.sh` and helper scripts; updated shellcheck directives; ran `bash -n installation/bootloader.sh installation/bootloader/*.sh` and `shellcheck -x installation/bootloader.sh installation/bootloader/*.sh` (all clean).
+- **2025-11-16 18:08 -03** Verified bootloader defaults exist via `ls installation/defaults/bootloader/{plymouth,sddm,mkinitcpio}`.
 
 ## Immediate next steps
 
 *(This list is refreshed at the beginning of each working block; update it whenever priorities change so it always reflects the current sprint.)*
 
-1. Stage and commit the packages module + progress log (include lint commands + duplicate check in message).
-2. Immediately tee up the next module (desktop or bootloader) with the same flow once this commit lands.
-3. Keep progress log synced at each step to avoid regressions.
+1. Inventory `installation/bootloader/*.sh` and defaults for missing headers/glossaries/comments; capture helper list.
+2. Document the lint plan: `bash -n installation/bootloader.sh installation/bootloader/*.sh`, `shellcheck -x ...`, and any mkinitcpio/limine dry-run validations.
+3. Keep the progress log synced after each action to avoid regressions.
 
 ## Suggestions queue
 
 - Use this section to record missing processes, configurations, commands, or helper functions that should exist but are not yet implemented.
 - Each entry should include timestamp, scope, suggested action, and whether it blocks current work.
 - When a suggestion is addressed, annotate the entry with the commit or log line that resolved it, then archive or remove it.
-- **2025-11-16 18:02 -03** — Scope: `installation/packages/`. Action: add module header + glossary to `packages.sh`, document manifest format, and lint lists for duplicates/empty lines. Status: blocking.
+- **2025-11-16 18:06 -03** — Scope: `installation/bootloader/` + `bootloader.sh`. Action: add module header/glossary, document each `archenemy_bootloader_*` helper with preconditions/paths, fix shellcheck directives, and define validation plan (mkinitcpio hooks, Limine config). Status: **Resolved 2025-11-16 18:08 -03** — headers + lint + defaults check completed.
+- **2025-11-16 18:02 -03** — Scope: `installation/packages/`. Action: add module header + glossary to `packages.sh`, document manifest format, and lint lists for duplicates/empty lines. Status: **Resolved 2025-11-16 18:03 -03** — header added and duplicate checks logged.
 - **2025-11-16 17:35 -03** — Scope: `installation/commons/*.sh`. Action: add context headers + variable glossaries + flow comments per inline rules. Status: blocking for commons sign-off. **Resolved 2025-11-16 17:40 -03** — inline docs added, see activity log entry for timestamp.
 
 ## Baseline checklist
