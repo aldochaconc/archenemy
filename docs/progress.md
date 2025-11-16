@@ -64,6 +64,7 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 18:37 -03** Added header/glossary to `installation/apps.sh`; ran `bash -n installation/apps.sh` and `shellcheck -x installation/apps.sh`; verified defaults via `ls installation/defaults/applications`.
 - **2025-11-16 18:37 -03** Apps module committed (`feat(apps): document desktop launcher sync`).
 - **2025-11-16 18:40 -03** Audited entire `installation/defaults/` tree; documented consumers + verification steps in `docs/defaults-audit.md`; module checklist row set to Ready.
+- **2025-11-16 18:42 -03** Shellchecked orchestrator via `bash -n installation/boot.sh` and `shellcheck -x installation/boot.sh`; updated shellcheck `source=` annotations in the orchestrator + commons aggregator to use repo-relative paths.
 
 ## Immediate next steps
 
