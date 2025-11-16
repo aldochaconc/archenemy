@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# Archenemy Command Center
+# Dynamic CLI entry point built on the module runtime.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export AE_ROOT="$SCRIPT_DIR"
+
+# shellcheck source=lib/core/runtime.sh
+source "$AE_ROOT/lib/core/runtime.sh"
+
+ae_runtime_main "$@"

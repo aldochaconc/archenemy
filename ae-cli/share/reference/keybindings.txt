@@ -1,0 +1,176 @@
+# Archenemy Keybindings Quick Reference
+# Grep-friendly format for fast lookup
+# Usage: grep -i "search term" keybindings.txt
+
+## NAVIGATION
+SUPER+h              Move focus left
+SUPER+j              Move focus down
+SUPER+k              Move focus up
+SUPER+l              Move focus right
+SUPER+LEFT           Move focus left (arrow fallback)
+SUPER+RIGHT          Move focus right (arrow fallback)
+SUPER+UP             Move focus up (arrow fallback)
+SUPER+DOWN           Move focus down (arrow fallback)
+
+## WINDOW SWAPPING
+SUPER+SHIFT+h        Swap window left
+SUPER+SHIFT+j        Swap window down
+SUPER+SHIFT+k        Swap window up
+SUPER+SHIFT+l        Swap window right
+SUPER+SHIFT+LEFT     Swap window left (arrow fallback)
+SUPER+SHIFT+RIGHT    Swap window right (arrow fallback)
+SUPER+SHIFT+UP       Swap window up (arrow fallback)
+SUPER+SHIFT+DOWN     Swap window down (arrow fallback)
+
+## WINDOW RESIZING
+SUPER+CTRL+h         Resize left (-20px)
+SUPER+CTRL+j         Resize down (+20px)
+SUPER+CTRL+k         Resize up (-20px)
+SUPER+CTRL+l         Resize right (+20px)
+SUPER+CTRL+LEFT      Resize left (arrow fallback)
+SUPER+CTRL+RIGHT     Resize right (arrow fallback)
+SUPER+CTRL+UP        Resize up (arrow fallback)
+SUPER+CTRL+DOWN      Resize down (arrow fallback)
+
+## WORKSPACES
+SUPER+1              Switch to workspace 1
+SUPER+2              Switch to workspace 2
+SUPER+3              Switch to workspace 3
+SUPER+4              Switch to workspace 4
+SUPER+5              Switch to workspace 5
+SUPER+6              Switch to workspace 6
+SUPER+7              Switch to workspace 7
+SUPER+8              Switch to workspace 8
+SUPER+9              Switch to workspace 9
+SUPER+TAB            Next workspace
+SUPER+SHIFT+TAB      Previous workspace
+SUPER+CTRL+TAB       Last visited workspace
+
+## MOVE WINDOW TO WORKSPACE
+SUPER+SHIFT+1        Move window to workspace 1
+SUPER+SHIFT+2        Move window to workspace 2
+SUPER+SHIFT+3        Move window to workspace 3
+SUPER+SHIFT+4        Move window to workspace 4
+SUPER+SHIFT+5        Move window to workspace 5
+SUPER+SHIFT+6        Move window to workspace 6
+SUPER+SHIFT+7        Move window to workspace 7
+SUPER+SHIFT+8        Move window to workspace 8
+SUPER+SHIFT+9        Move window to workspace 9
+
+## WINDOW CONTROL
+SUPER+w              Close active window
+SUPER+q              Close active window (alternative)
+SUPER+v              Toggle floating
+SUPER+f              Toggle fullscreen
+SUPER+CTRL+f         Toggle tiled fullscreen
+SUPER+ALT+f          Toggle full width
+SUPER+t              Toggle split direction
+SUPER+p              Toggle pseudotile
+SUPER+o              Pop window out (float & pin)
+
+## WINDOW GROUPS
+SUPER+g              Toggle window grouping
+SUPER+ALT+g          Move window out of group
+SUPER+ALT+LEFT       Join group on left
+SUPER+ALT+RIGHT      Join group on right
+SUPER+ALT+UP         Join group above
+SUPER+ALT+DOWN       Join group below
+SUPER+ALT+TAB        Next window in group
+SUPER+ALT+SHIFT+TAB  Previous window in group
+SUPER+ALT+1          Jump to 1st window in group
+SUPER+ALT+2          Jump to 2nd window in group
+SUPER+ALT+3          Jump to 3rd window in group
+SUPER+ALT+4          Jump to 4th window in group
+SUPER+ALT+5          Jump to 5th window in group
+
+## SCRATCHPAD
+SUPER+s              Toggle scratchpad
+SUPER+ALT+s          Move window to scratchpad
+
+## WINDOW CYCLING
+ALT+TAB              Next window
+ALT+SHIFT+TAB        Previous window
+
+## APPLICATIONS
+SUPER+RETURN         Launch terminal
+SUPER+b              Launch browser
+SUPER+f              Launch file manager
+SUPER+e              Launch editor
+SUPER+SPACE          Application launcher
+SUPER+SEMICOLON      Application launcher (vim-style)
+SUPER+SLASH          Search
+
+## SECONDARY APPLICATIONS
+SUPER+SHIFT+m        Launch music player
+SUPER+SHIFT+g        Launch messenger
+SUPER+SHIFT+p        Launch password manager
+SUPER+SHIFT+t        Launch task monitor (btop)
+SUPER+SHIFT+d        Launch Docker manager
+
+## CLIPBOARD
+SUPER+c              Universal copy
+SUPER+v              Universal paste
+SUPER+x              Universal cut
+SUPER+CTRL+v         Clipboard history manager
+
+## SYSTEM TOGGLES
+SUPER+CTRL+n         Toggle nightlight
+SUPER+CTRL+i         Toggle idle lock
+SUPER+CTRL+l         Lock screen
+SUPER+CTRL+r         Reload Hyprland config
+SUPER+BACKSPACE      Toggle window transparency
+SUPER+SHIFT+BACKSPACE Toggle workspace gaps
+SUPER+SHIFT+SPACE    Toggle waybar
+
+## NOTIFICATIONS
+SUPER+COMMA          Dismiss last notification
+SUPER+SHIFT+COMMA    Dismiss all notifications
+SUPER+CTRL+COMMA     Toggle Do Not Disturb
+
+## MEDIA CONTROLS
+XF86AudioRaiseVolume Volume up (5% steps)
+XF86AudioLowerVolume Volume down (5% steps)
+XF86AudioMute        Mute/unmute toggle
+XF86AudioMicMute     Microphone mute toggle
+ALT+XF86AudioRaise   Volume up (1% precise)
+ALT+XF86AudioLower   Volume down (1% precise)
+
+## BRIGHTNESS
+XF86MonBrightnessUp   Brightness up (5% steps)
+XF86MonBrightnessDown Brightness down (5% steps)
+ALT+XF86BrightnessUp  Brightness up (1% precise)
+ALT+XF86BrightnessDown Brightness down (1% precise)
+
+## MEDIA PLAYBACK
+XF86AudioPlay        Play/pause toggle
+XF86AudioPause       Pause
+XF86AudioNext        Next track
+XF86AudioPrev        Previous track
+SUPER+XF86AudioMute  Switch audio output
+
+## SCREENSHOTS
+PRINT                Screenshot to clipboard
+SHIFT+PRINT          Selection screenshot to clipboard
+SUPER+PRINT          Color picker
+ALT+PRINT            Screen recording menu
+
+## INFORMATION DISPLAY
+SUPER+CTRL+t         Show time and date
+SUPER+CTRL+b         Show battery status
+
+## SYSTEM MENU
+SUPER+ESCAPE         System menu (power, logout, etc)
+XF86PowerOff         Power menu
+XF86Calculator       Calculator
+
+## UTILITIES
+SUPER+CTRL+e         Emoji picker
+SUPER+CTRL+c         Color picker
+SUPER+CTRL+SPACE     Next background
+
+## MOUSE ACTIONS
+SUPER+LMB_DRAG       Move window
+SUPER+RMB_DRAG       Resize window
+SUPER+SCROLL         Switch workspace
+SUPER+ALT+SCROLL     Cycle group windows
+
