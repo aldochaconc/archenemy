@@ -65,6 +65,8 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 18:37 -03** Apps module committed (`feat(apps): document desktop launcher sync`).
 - **2025-11-16 18:40 -03** Audited entire `installation/defaults/` tree; documented consumers + verification steps in `docs/defaults-audit.md`; module checklist row set to Ready.
 - **2025-11-16 19:20 -03** Automated defaults verification via `scripts/verify-defaults.sh`; sections in `docs/defaults-audit.md` marked as verified.
+- **2025-11-16 19:25 -03** README reviewed against final module layout; no edits required.
+- **2025-11-16 19:26 -03** Added `docs/release-checklist.md` to capture tagging/tests procedure.
 - **2025-11-16 18:42 -03** Shellchecked orchestrator via `bash -n installation/boot.sh` and `shellcheck -x installation/boot.sh`; updated shellcheck `source=` annotations in the orchestrator + commons aggregator to use repo-relative paths.
 
 ## Immediate next steps
