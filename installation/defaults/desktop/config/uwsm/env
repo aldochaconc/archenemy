@@ -1,0 +1,6 @@
+# Changes require a restart to take effect.
+
+# Load defaults (terminal, editor, etc.)
+if [ -f ~/.config/uwsm/default ]; then
+  source ~/.config/uwsm/default
+fi

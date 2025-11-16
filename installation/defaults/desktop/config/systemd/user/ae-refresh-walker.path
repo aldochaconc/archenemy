@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Walker defaults for changes
+
+[Path]
+PathChanged=%h/.config/archenemy/installation/defaults/desktop/config/walker
+PathModified=%h/.config/archenemy/installation/defaults/desktop/config/walker
+Unit=ae-refresh-walker.service
+
+[Install]
+WantedBy=default.target
