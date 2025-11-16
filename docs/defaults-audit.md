@@ -4,6 +4,18 @@ This file summarizes the verification of every artifact under `installation/defa
 Goal: ensure every directory/file has a consumer in `installation/*.sh` or the runtime,
 and no path points to legacy assets.
 
+## Verification Plan
+
+Each subsection below must be validated iteratively. For every run:
+
+1. **List assets**: `find installation/defaults/<surface> -type f | sort`.
+2. **Map consumers**: `rg -n '<relative/path>' -n installation` or callsite-specific commands.
+3. **Automated check**: run the module's lint/tests (`bash -n`, `shellcheck`, or runtime smoke command).
+4. **Smells**: note missing files, outdated references, or unused assets in `docs/progress.md` (Suggestions queue).
+5. **Sign-off**: once automated script exits cleanly and consumers match, mark the block as “Verified”.
+
+Automate steps 1–3 via helper scripts (see `scripts/verify-defaults.sh` placeholder).
+
 ## System defaults (`installation/defaults/system`)
 
 - Files: `pacman/pacman.conf`, `pacman/mirrorlist`, `gpg/dirmngr.conf`,
@@ -18,6 +30,8 @@ and no path points to legacy assets.
   - `bash -n installation/system.sh installation/cleanup.sh`.
   - `shellcheck -x installation/system.sh installation/cleanup.sh`.
 
+Status: ✅ Verified 2025-11-16 via `scripts/verify-defaults.sh`.
+
 ## Bootloader defaults (`installation/defaults/bootloader`)
 
 - Files: `mkinitcpio/archenemy_hooks.conf`, plymouth theme directory, SDDM templates.
@@ -27,6 +41,8 @@ and no path points to legacy assets.
   - `ls installation/defaults/bootloader/{plymouth,sddm,mkinitcpio}`.
   - `bash -n installation/bootloader.sh installation/bootloader/*.sh`.
   - `shellcheck -x installation/bootloader.sh installation/bootloader/*.sh`.
+
+Status: ✅ Verified 2025-11-16 via `scripts/verify-defaults.sh`.
 
 ## Desktop defaults (`installation/defaults/desktop`)
 
@@ -39,6 +55,8 @@ and no path points to legacy assets.
   - `rg --files installation/defaults/desktop/config/systemd/user | sort`.
   - `bash -n installation/desktop.sh`; `shellcheck -x installation/desktop.sh`.
 
+Status: ✅ Verified 2025-11-16 via `scripts/verify-defaults.sh`.
+
 ## Applications defaults (`installation/defaults/applications`)
 
 - Contains `.desktop` launchers (including `hidden/`) and icon assets under `icons/`.
@@ -47,11 +65,14 @@ and no path points to legacy assets.
   - `ls installation/defaults/applications | head`.
   - `bash -n installation/apps.sh`; `shellcheck -x installation/apps.sh`.
 
+Status: ✅ Verified 2025-11-16 via `scripts/verify-defaults.sh`.
+
 ## Sentinel defaults (`installation/defaults/sentinel`)
 
 - File: `postinstall-profile.sh`.
 - Consumer: `installation/commons/sentinel.sh`.
 - Verified via `find installation/defaults/sentinel -type f`.
+Status: ✅ Verified 2025-11-16 via `scripts/verify-defaults.sh`.
 
 ## Summary
 
