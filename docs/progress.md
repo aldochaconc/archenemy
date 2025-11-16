@@ -37,14 +37,19 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 17:41 -03** Ran `bash -n installation/commons/*.sh` and `shellcheck -x installation/commons/*.sh`; resolved SC1091 info messages by pointing shellcheck directives to project-root paths.
 - **2025-11-16 17:48 -03** Commons risk review: no outstanding TODOs beyond pending commit; readiness set to “Ready” in module table.
 - **2025-11-16 17:48 -03** Next focus: prepare documentation/testing plan for `installation/system.sh` mirroring the process used for commons (add top-level header + variable glossary, document each `_system_*` helper, then run `bash -n installation/system.sh` and `shellcheck -x installation/system.sh`).
+- **2025-11-16 17:55 -03** Context reloaded for `installation/system.sh` work — branch `v1.0.0`, `pwd=/home/crystal/Work/archenemy`, `AE_ROOT=<unset>`, `XDG_CONFIG_HOME=/home/crystal/.config`.
+- **2025-11-16 17:56 -03** Inventoried `installation/system.sh`; missing top-level header, variable glossary, and per-helper context comments. Helpers present: `_system_configure_pacman`, `_system_configure_system_gpg`, `_system_setup_first_run_privileges`, `_system_configure_sudo_policy`, `_system_disable_mkinitcpio_hooks`, `_system_install_aur_helper`, `_system_configure_firewall`, `_system_configure_ssh`, `_system_configure_dns_resolver`, `_system_configure_power_profiles`, `_system_deploy_battery_monitor`, `run_system_preinstall`, `run_system_postinstall`, `run_system`.
+- **2025-11-16 17:58 -03** Added system module header + variable glossary (MODULE_DIR, SYSTEM_DEFAULTS_DIR, SYSTEM_POWER_UNITS_DIR) and updated shellcheck directive to reference repo path.
+- **2025-11-16 17:59 -03** Ran `bash -n installation/system.sh` and `shellcheck -x installation/system.sh`; SC1091 resolved by pointing shellcheck directive to `installation/commons/common.sh`.
+- **2025-11-16 18:00 -03** Reviewed documentation blocks for all `_system_*` helpers; existing comments already describe intent/preconditions, so no further inline changes required.
 
 ## Immediate next steps
 
 *(This list is refreshed at the beginning of each working block; update it whenever priorities change so it always reflects the current sprint.)*
 
-1. Stage and prepare the commons-only commit (verify `git diff --stat installation/commons docs/progress.md` and capture tests in the message).
-2. Apply the documented header/glossary/comment updates to `installation/system.sh`.
-3. Run `bash -n installation/system.sh` and `shellcheck -x installation/system.sh`, logging outcomes + risks.
+1. Stage and prepare the `installation/system.sh` + `docs/progress.md` commit (include lint commands in message).
+2. After committing, set up the inventory + plan for the next unlocked module (`installation/packages/`).
+3. Keep progress log synced at each step to avoid regressions.
 
 ## Suggestions queue
 
