@@ -7,8 +7,8 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 | Surface                        | Status     | Scope / Includes                                                                                        | Key notes                                                                   |
 | ------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `installation/commons/`        | Ready       | Shared helpers invoked from `system.sh`, `bootloader`, `drivers`, etc.                                   | Inline docs + lint complete; stage for commit after risk review.            |
-| `installation/system.sh`       | Pending    | Main orchestrator; entry point calling `bootloader.sh`, `desktop.sh`, and the rest of the installer.     | Must preserve logical order and handle global flags.                        |
-| `installation/packages/`       | Pending    | `core`, `pacman`, `aur`, `apps` lists plus the `packages.sh` script that ties them together.             | Watch for duplicates and script cross dependencies.                         |
+| `installation/system.sh`       | Ready      | Main orchestrator; entry point calling `bootloader.sh`, `desktop.sh`, and the rest of the installer.     | Inline docs + lint complete; tests logged; proceed to next module.          |
+| `installation/packages/`       | In Progress | `core`, `pacman`, `aur`, `apps` lists plus the `packages.sh` script that ties them together.             | Watch for duplicates and script cross dependencies.                         |
 | `installation/bootloader.*`    | Pending    | `bootloader.sh`, the `bootloader/` directory, `mkinitcpio` hooks, plymouth themes.                       | Confirm referenced assets and config paths exist.                           |
 | `installation/drivers.*`       | Pending    | `drivers.sh` plus `drivers/` subfolders (GPU, input, firmware).                                          | Validate hardware detection logic and minimal package sets.                 |
 | `installation/desktop.*`       | Pending    | `desktop.sh`, `defaults/`, `installation/defaults/`, Hypr/graphics scripts, dotfiles.                   | Keep assets and installer behavior in sync.                                 |
@@ -42,13 +42,16 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 17:58 -03** Added system module header + variable glossary (MODULE_DIR, SYSTEM_DEFAULTS_DIR, SYSTEM_POWER_UNITS_DIR) and updated shellcheck directive to reference repo path.
 - **2025-11-16 17:59 -03** Ran `bash -n installation/system.sh` and `shellcheck -x installation/system.sh`; SC1091 resolved by pointing shellcheck directive to `installation/commons/common.sh`.
 - **2025-11-16 18:00 -03** Reviewed documentation blocks for all `_system_*` helpers; existing comments already describe intent/preconditions, so no further inline changes required.
+- **2025-11-16 18:01 -03** System module committed (`feat(system): add orchestrator script`) after passing `bash -n installation/system.sh` and `shellcheck -x installation/system.sh`.
+- **2025-11-16 18:02 -03** Context reloaded for packages module; `ls installation/packages` lists `aur.package`, `pacman.package`; `packages.sh` orchestrates `_install_packages_from_manifest`.
+- **2025-11-16 18:03 -03** Added header + glossary to `installation/packages.sh`; ran `bash -n installation/packages.sh` and `shellcheck -x installation/packages.sh` (both clean). Verified `installation/packages/pacman.package` and `aur.package` have no duplicate entries via Python counters.
 
 ## Immediate next steps
 
 *(This list is refreshed at the beginning of each working block; update it whenever priorities change so it always reflects the current sprint.)*
 
-1. Stage and prepare the `installation/system.sh` + `docs/progress.md` commit (include lint commands in message).
-2. After committing, set up the inventory + plan for the next unlocked module (`installation/packages/`).
+1. Stage and commit the packages module + progress log (include lint commands + duplicate check in message).
+2. Immediately tee up the next module (desktop or bootloader) with the same flow once this commit lands.
 3. Keep progress log synced at each step to avoid regressions.
 
 ## Suggestions queue
@@ -56,6 +59,7 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - Use this section to record missing processes, configurations, commands, or helper functions that should exist but are not yet implemented.
 - Each entry should include timestamp, scope, suggested action, and whether it blocks current work.
 - When a suggestion is addressed, annotate the entry with the commit or log line that resolved it, then archive or remove it.
+- **2025-11-16 18:02 -03** — Scope: `installation/packages/`. Action: add module header + glossary to `packages.sh`, document manifest format, and lint lists for duplicates/empty lines. Status: blocking.
 - **2025-11-16 17:35 -03** — Scope: `installation/commons/*.sh`. Action: add context headers + variable glossaries + flow comments per inline rules. Status: blocking for commons sign-off. **Resolved 2025-11-16 17:40 -03** — inline docs added, see activity log entry for timestamp.
 
 ## Baseline checklist
