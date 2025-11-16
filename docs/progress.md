@@ -8,10 +8,10 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 | ------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `installation/commons/`        | Ready       | Shared helpers invoked from `system.sh`, `bootloader`, `drivers`, etc.                                   | Inline docs + lint complete; stage for commit after risk review.            |
 | `installation/system.sh`       | Ready      | Main orchestrator; entry point calling `bootloader.sh`, `desktop.sh`, and the rest of the installer.     | Inline docs + lint complete; tests logged; proceed to next module.          |
-| `installation/packages/`       | In Progress | `core`, `pacman`, `aur`, `apps` lists plus the `packages.sh` script that ties them together.             | Watch for duplicates and script cross dependencies.                         |
+| `installation/packages/`       | Ready      | `core`, `pacman`, `aur`, `apps` lists plus the `packages.sh` script that ties them together.             | Header + manifests committed; duplicates checked.                           |
 | `installation/bootloader.*`    | Ready      | `bootloader.sh`, the `bootloader/` directory, `mkinitcpio` hooks, plymouth themes.                       | Headers + lint done; assets verified; ready for commit history.             |
 | `installation/drivers.*`       | Pending    | `drivers.sh` plus `drivers/` subfolders (GPU, input, firmware).                                          | Validate hardware detection logic and minimal package sets.                 |
-| `installation/desktop.*`       | Pending    | `desktop.sh`, `defaults/`, `installation/defaults/`, Hypr/graphics scripts, dotfiles.                   | Keep assets and installer behavior in sync.                                 |
+| `installation/desktop.*`       | In Progress | `desktop.sh`, `defaults/`, `installation/defaults/`, Hypr/graphics scripts, dotfiles.                   | Validate config/home defaults + watchers/services.                          |
 | `installation/cleanup.sh`/`reboot.sh` | Pending    | Final cleanup and reboot scripts, sentinel services.                                                     | Ensure they clear logs/tmp and control final machine state.                 |
 | `defaults/`                    | Pending    | Dotfiles, assets, systemd user services, wallpapers, icons.                                              | Confirm scripts install them into the expected paths.                       |
 
@@ -49,13 +49,17 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - **2025-11-16 18:07 -03** Bootloader plan: add headers/glossaries to `bootloader.sh` and each helper file, ensure shellcheck directives use repo paths, then run `bash -n installation/bootloader.sh installation/bootloader/*.sh` and `shellcheck -x` equivalents. Validate defaults via `ls installation/defaults/bootloader` and confirm plymouth/SDDM templates exist before committing.
 - **2025-11-16 18:08 -03** Added module headers + variable glossaries to `installation/bootloader.sh` and helper scripts; updated shellcheck directives; ran `bash -n installation/bootloader.sh installation/bootloader/*.sh` and `shellcheck -x installation/bootloader.sh installation/bootloader/*.sh` (all clean).
 - **2025-11-16 18:08 -03** Verified bootloader defaults exist via `ls installation/defaults/bootloader/{plymouth,sddm,mkinitcpio}`.
+- **2025-11-16 18:09 -03** Bootloader module committed (`feat(bootloader): add configuration helpers`), unlocking desktop module.
+- **2025-11-16 18:10 -03** Context reloaded for desktop module; `installation/desktop.sh` contains config sync, shell setup, icons/fonts, watchers. Needs module header/glossary, per-helper descriptions, validation of `installation/defaults/desktop/{config,home}` assets, and watcher systemd unit checks.
+- **2025-11-16 18:11 -03** Desktop plan: add header/glossary + per-helper doc blocks, ensure rsync paths and watcher names are explained, run `bash -n installation/desktop.sh` and `shellcheck -x installation/desktop.sh`, verify defaults via `ls installation/defaults/desktop/{config,home}`.
+- **2025-11-16 18:13 -03** Added module header/glossary to `installation/desktop.sh`; ran `bash -n installation/desktop.sh` and `shellcheck -x installation/desktop.sh` (clean). Verified defaults with `ls installation/defaults/desktop/{config,home}` and watcher units exist under `installation/defaults/desktop/config/systemd/user`.
 
 ## Immediate next steps
 
 *(This list is refreshed at the beginning of each working block; update it whenever priorities change so it always reflects the current sprint.)*
 
-1. Inventory `installation/bootloader/*.sh` and defaults for missing headers/glossaries/comments; capture helper list.
-2. Document the lint plan: `bash -n installation/bootloader.sh installation/bootloader/*.sh`, `shellcheck -x ...`, and any mkinitcpio/limine dry-run validations.
+1. Inventory `installation/desktop.*` + `installation/defaults/` for missing headers/glossaries/comments; capture helper list.
+2. Define the lint plan for desktop (scripts + configs) before editing; note any asset checks required.
 3. Keep the progress log synced after each action to avoid regressions.
 
 ## Suggestions queue
@@ -64,6 +68,7 @@ Temporary notebook to cache decisions and tasks while consolidating version 1.0.
 - Each entry should include timestamp, scope, suggested action, and whether it blocks current work.
 - When a suggestion is addressed, annotate the entry with the commit or log line that resolved it, then archive or remove it.
 - **2025-11-16 18:06 -03** — Scope: `installation/bootloader/` + `bootloader.sh`. Action: add module header/glossary, document each `archenemy_bootloader_*` helper with preconditions/paths, fix shellcheck directives, and define validation plan (mkinitcpio hooks, Limine config). Status: **Resolved 2025-11-16 18:08 -03** — headers + lint + defaults check completed.
+- **2025-11-16 18:10 -03** — Scope: `installation/desktop.*` + `installation/defaults/desktop`. Action: add module header/glossary, document config/home sync helpers, ensure watcher services are explained, and validate defaults tree. Status: blocking.
 - **2025-11-16 18:02 -03** — Scope: `installation/packages/`. Action: add module header + glossary to `packages.sh`, document manifest format, and lint lists for duplicates/empty lines. Status: **Resolved 2025-11-16 18:03 -03** — header added and duplicate checks logged.
 - **2025-11-16 17:35 -03** — Scope: `installation/commons/*.sh`. Action: add context headers + variable glossaries + flow comments per inline rules. Status: blocking for commons sign-off. **Resolved 2025-11-16 17:40 -03** — inline docs added, see activity log entry for timestamp.
 
