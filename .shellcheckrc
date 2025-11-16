@@ -1,0 +1,4 @@
+# shellcheck configuration for archenemy project
+# Enable following of sourced files
+external-sources=true
+

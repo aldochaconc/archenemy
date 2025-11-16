@@ -1,0 +1,400 @@
+# Archenemy Hyprland Troubleshooting Guide
+# Common issues and their solutions
+
+## CONFIGURATION NOT LOADING
+
+### Symptom: Hyprland doesn't load or crashes on start
+Solution:
+1. Check for syntax errors in config files
+   hyprctl reload
+   # Look for error messages
+
+2. View Hyprland logs
+   cat /tmp/hypr/*/hyprland.log | tail -n 50
+
+3. Test with minimal config
+   mv ~/.config/hypr/hyprland.conf ~/.config/hypr/hyprland.conf.backup
+   cp /etc/hyprland/hyprland.conf ~/.config/hypr/hyprland.conf
+
+4. Add back sections one at a time to identify the issue
+
+### Symptom: Config changes not applied
+Solution:
+1. Reload configuration
+   hyprctl reload
+   # Or: ae hypr reload
+
+2. Check file permissions
+   ls -la ~/.config/hypr/
+
+3. Verify file is being sourced
+   grep "source" ~/.config/hypr/hyprland.conf
+
+
+## KEYBINDINGS NOT WORKING
+
+### Symptom: Specific keybinding doesn't respond
+Solution:
+1. Check if keybinding is actually configured
+   hyprctl binds | grep -i "SUPER"
+   # Or: ae hypr binds
+
+2. Test if Hyprland is receiving the key
+   hyprctl keyword debug:enable_stdout_logs true
+   # Watch terminal for key events
+
+3. Check for conflicting bindings
+   hyprctl binds | grep "KEY_NAME"
+
+4. Verify modifier keys are working
+   xev  # For XWayland apps
+   wev  # For native Wayland
+
+5. Reload configuration
+   ae hypr reload
+
+### Symptom: All keybindings stopped working
+Solution:
+1. Check if Hyprland is responsive
+   hyprctl version
+
+2. Try reloading with a terminal
+   hyprctl reload
+
+3. Check for syntax errors in binding files
+   cat ~/.config/hypr/bindings/*.conf
+
+4. Restart Hyprland (SUPER+SHIFT+E or TTY)
+
+
+## DISPLAY / MONITOR ISSUES
+
+### Symptom: Monitor not detected or wrong resolution
+Solution:
+1. List available monitors
+   hyprctl monitors
+   # Or: ae hypr monitors
+
+2. Check monitor configuration
+   cat ~/.config/hypr/monitors.conf
+
+3. Try auto-detection
+   monitor=,preferred,auto,auto
+
+4. Force specific resolution
+   monitor=DP-1,1920x1080@60,0x0,1
+
+5. Disable problematic monitor temporarily
+   monitor=HDMI-A-1,disable
+
+### Symptom: Blurry text or wrong scaling
+Solution:
+1. Adjust GDK_SCALE
+   # In ~/.config/hypr/envs.conf
+   env = GDK_SCALE,2
+
+2. Set monitor scale
+   monitor=eDP-1,preferred,auto,1.5
+
+3. Enable XWayland force scaling
+   xwayland {
+     force_zero_scaling = true
+   }
+
+4. Check fractional scaling
+   # Ensure monitor scale matches GDK_SCALE appropriately
+
+
+## WINDOW RULES NOT APPLYING
+
+### Symptom: Window rules don't affect specific applications
+Solution:
+1. Find correct window class
+   hyprctl clients | grep -i "APP_NAME"
+
+2. Check window class in real-time
+   hyprctl activewindow | grep class
+
+3. Use regex for matching
+   windowrulev2 = float, class:^(MyApp)$
+
+4. Check rule order (earlier rules take precedence)
+
+5. Try with initialTitle instead
+   windowrulev2 = float, initialTitle:^(MyApp)$
+
+6. Reload after changes
+   ae hypr reload
+
+
+## APPLICATION LAUNCH ISSUES
+
+### Symptom: Applications don't start or crash
+Solution:
+1. Launch from terminal to see errors
+   kitty
+   chromium
+   # Look for error messages
+
+2. Check if using correct Wayland flags
+   chromium --enable-features=UseOzonePlatform --ozone-platform=wayland
+
+3. Use uwsm-app wrapper
+   uwsm-app -- APPLICATION
+
+4. Check environment variables
+   env | grep -E "WAYLAND|XDG|QT|GDK"
+
+5. Try XWayland fallback
+   WAYLAND_DISPLAY= APPLICATION
+
+### Symptom: Application appears but is invisible
+Solution:
+1. Check window rules aren't hiding it
+   hyprctl clients
+
+2. Try different workspace
+   SUPER+1, SUPER+2, etc.
+
+3. Check if it's on a different monitor
+   ae hypr monitors
+
+4. Bring to front
+   hyprctl dispatch bringactivetotop
+
+
+## PERFORMANCE ISSUES
+
+### Symptom: Animations are laggy or stuttering
+Solution:
+1. Reduce animation speeds
+   # In ~/.config/hypr/looknfeel.conf
+   animation = windows, 1, 2, default
+
+2. Disable blur temporarily
+   decoration:blur:enabled = false
+
+3. Reduce blur quality
+   decoration:blur:passes = 1
+
+4. Disable animations for testing
+   animations:enabled = false
+
+5. Check system resources
+   btop
+   # Look for CPU/GPU usage
+
+### Symptom: High CPU usage when idle
+Solution:
+1. Check for problematic applications
+   btop
+
+2. Disable window swallowing
+   misc:enable_swallow = false
+
+3. Check Hyprland logs for errors
+   ae hypr logs
+
+4. Disable damage tracking debug
+   hyprctl keyword debug:damage_tracking false
+
+
+## GRAPHICS / RENDERING ISSUES
+
+### Symptom: Screen tearing or artifacts
+Solution:
+1. Enable tearing only when needed
+   general:allow_tearing = true
+   windowrulev2 = immediate, class:^(game)$
+
+2. Check GPU driver
+   glxinfo | grep "OpenGL renderer"
+   vulkaninfo | grep "deviceName"
+
+3. Force specific backend
+   WLR_RENDERER=vulkan hyprland
+   # Or: WLR_RENDERER=gles2 hyprland
+
+### Symptom: Transparent windows showing wrong content
+Solution:
+1. Check opacity settings
+   hyprctl getoption decoration:active_opacity
+
+2. Disable blur for testing
+   decoration:blur:enabled = false
+
+3. Check window rules
+   cat ~/.config/hypr/apps/*.conf | grep opacity
+
+
+## INPUT DEVICE ISSUES
+
+### Symptom: Keyboard layout not working
+Solution:
+1. Check configured layout
+   # In ~/.config/hypr/input.conf
+   input:kb_layout = us,es
+
+2. Set XKB options correctly
+   input:kb_options = grp:alt_shift_toggle
+
+3. Test with setxkbmap (temporary)
+   setxkbmap -layout us,es -option grp:alt_shift_toggle
+
+### Symptom: Touchpad not responding or gestures not working
+Solution:
+1. Check touchpad configuration
+   # In ~/.config/hypr/input.conf
+   input {
+     touchpad {
+       natural_scroll = true
+       tap-and-drag = true
+     }
+   }
+
+2. Enable workspace swipe
+   input:gestures:workspace_swipe = true
+
+3. Check libinput
+   libinput list-devices
+
+### Symptom: Mouse sensitivity too high/low
+Solution:
+1. Adjust sensitivity
+   input:sensitivity = 0.5  # Range: -1.0 to 1.0
+
+2. Change acceleration
+   input:accel_profile = flat  # or adaptive
+
+
+## NOTIFICATION ISSUES
+
+### Symptom: Notifications not appearing
+Solution:
+1. Check if Mako is running
+   pgrep mako
+
+2. Start Mako manually
+   uwsm-app -- mako
+
+3. Check Mako configuration
+   cat ~/.config/mako/config
+
+4. Test notification
+   notify-send "Test" "This is a test"
+
+5. Check DND mode
+   makoctl mode
+   # Disable DND: ae hypr dispatch exec makoctl mode -r do-not-disturb
+
+
+## AUTOSTART ISSUES
+
+### Symptom: Applications don't start automatically
+Solution:
+1. Check autostart configuration
+   cat ~/.config/hypr/autostart.conf
+
+2. Use exec-once instead of exec
+   exec-once = uwsm-app -- waybar
+
+3. Check application logs
+   journalctl --user -xe
+
+4. Add delay for problematic apps
+   exec-once = sleep 2 && uwsm-app -- APPLICATION
+
+
+## CLIPBOARD ISSUES
+
+### Symptom: Clipboard not working between applications
+Solution:
+1. Install clipboard manager
+   paru -S wl-clipboard cliphist
+
+2. Start clipboard manager
+   uwsm-app -- cliphist
+
+3. Use wl-copy/wl-paste
+   echo "test" | wl-copy
+   wl-paste
+
+4. Check XWayland clipboard sync
+   # Should be running automatically
+
+
+## SYSTEM COMMANDS
+
+### Diagnostic commands
+ae info                    # System overview
+ae hypr info full          # Full Hyprland info
+ae hypr debug              # Debug information
+ae hypr logs               # View logs
+hyprctl systeminfo                # System information
+hyprctl clients                   # List all windows
+hyprctl monitors                  # List monitors
+
+### Configuration commands
+ae edit                    # Edit configs interactively
+ae hypr reload             # Reload configuration
+ae keys --search           # Search keybindings
+
+### Quick fixes
+hyprctl reload                    # Reload config
+hyprctl dispatch exit             # Exit Hyprland
+loginctl kill-session $XDG_SESSION_ID  # Force logout
+
+
+## GETTING HELP
+
+1. Check official documentation
+   https://wiki.hyprland.org/
+
+2. View Archenemy keybindings
+   ae keys
+   cat ~/.config/hypr/KEYBINDINGS.md
+
+3. Check configuration examples
+   cat ~/.config/hypr/README.md
+
+4. View Hyprland logs
+   ae hypr logs
+
+5. Check system logs
+   journalctl --user -xe -u hyprland
+
+6. Enable debug logging
+   hyprctl keyword debug:enable_stdout_logs true
+   hyprctl keyword debug:damage_tracking true
+
+7. Discord/Matrix communities
+   - Hyprland Discord: https://discord.gg/hyprland
+   - Matrix: #hyprland:matrix.org
+
+
+## EMERGENCY RECOVERY
+
+### If Hyprland won't start or is completely broken:
+
+1. Switch to TTY
+   Ctrl+Alt+F2
+
+2. Kill Hyprland session
+   pkill -9 Hyprland
+
+3. Backup current config
+   mv ~/.config/hypr ~/.config/hypr.backup
+
+4. Restore default config
+   cp -r /etc/hypr ~/.config/hypr
+
+5. Or start with minimal config
+   echo 'exec-once = kitty' > ~/.config/hypr/hyprland.conf
+
+6. Start Hyprland again
+   hyprland
+   # Or: uwsm start hyprland-uwsm.desktop
+
+7. Gradually restore your configuration
+   ae edit
+

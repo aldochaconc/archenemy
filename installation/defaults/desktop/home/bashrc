@@ -1,0 +1,8 @@
+# Managed by the archenemy installer. Replace or extend this file with the
+# user's preferred bootstrap commands.
+
+if [ -x /usr/bin/starship ]; then
+  eval "$(starship init bash)"
+fi
+
+[[ -f ~/.bashrc.local ]] && source ~/.bashrc.local

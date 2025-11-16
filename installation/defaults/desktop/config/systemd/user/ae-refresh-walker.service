@@ -1,0 +1,11 @@
+[Unit]
+Description=Archenemy refresh Walker defaults
+ConditionPathExists=%h/.config/archenemy/ae-cli/ae
+ConditionPathIsDirectory=%h/.config/archenemy/installation/defaults/desktop/config/walker
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/archenemy/ae-cli/ae refresh walker
+
+[Install]
+WantedBy=default.target

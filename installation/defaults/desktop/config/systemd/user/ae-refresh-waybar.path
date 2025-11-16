@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Waybar defaults for changes
+
+[Path]
+PathChanged=%h/.config/archenemy/installation/defaults/desktop/config/waybar
+PathModified=%h/.config/archenemy/installation/defaults/desktop/config/waybar
+Unit=ae-refresh-waybar.service
+
+[Install]
+WantedBy=default.target

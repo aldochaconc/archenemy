@@ -1,0 +1,26 @@
+# System-level AUR helpers
+ufw-docker
+
+# Dotfiles dependencies
+oh-my-zsh-git
+ghostty-bin
+
+# Desktop-related AUR packages
+hyprsunset
+walker-git
+elephant
+elephant-calc
+elephant-clipboard
+elephant-bluetooth
+elephant-desktopapplications
+elephant-files
+elephant-menus
+elephant-providerlist
+elephant-runner
+elephant-symbols
+elephant-todo
+elephant-unicode
+elephant-websearch
+yaru-icon-theme
+localsend-bin
+spotify

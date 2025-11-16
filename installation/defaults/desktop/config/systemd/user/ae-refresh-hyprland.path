@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Hyprland defaults for changes
+
+[Path]
+PathChanged=%h/.config/archenemy/installation/defaults/desktop/config/hypr
+PathModified=%h/.config/archenemy/installation/defaults/desktop/config/hypr
+Unit=ae-refresh-hyprland.service
+
+[Install]
+WantedBy=default.target
