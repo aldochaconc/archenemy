@@ -21,7 +21,7 @@ set -euo pipefail
 
 # Configuration -----------------------------------------------------------------
 CUSTOM_REPO="${CUSTOM_REPO:-aldochaconc/archenemy}"
-CUSTOM_REF="${CUSTOM_REF:-main}"
+CUSTOM_REF="${CUSTOM_REF:-master}"
 DEFAULT_ARCHENEMY_PATH="$HOME/.config/archenemy"
 DEFAULT_ARCHENEMY_TARGET_ROOT="/mnt"
 
@@ -212,7 +212,7 @@ clone_repo_with_git() {
     return 1
   fi
 
-  if [[ "$CUSTOM_REF" != "main" ]]; then
+  if [[ "$CUSTOM_REF" != "master" ]]; then
     (cd "$ARCHENEMY_PATH" && git fetch origin "$CUSTOM_REF" >/dev/null 2>&1 && git checkout "$CUSTOM_REF" >/dev/null 2>&1)
   fi
 }
