@@ -83,6 +83,8 @@ brightnessctl
 fcitx5
 fcitx5-gtk
 fcitx5-im
+fcitx5-configtool
+fcitx5-qt
 chromium
 ttf-fira-code
 noto-fonts
@@ -123,6 +125,4 @@ inkscape
 kdenlive
 obs-studio
 vlc
-
-# Desktop entry utilities
 desktop-file-utils
