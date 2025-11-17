@@ -58,12 +58,6 @@ _install_packages_from_manifest() {
     return
   fi
 
-  if [[ "$installer" == "aur" ]]; then
-    _archenemy_query_packages_with_yay "${packages[@]}"
-  else
-    _archenemy_query_packages_with_pacman "${packages[@]}"
-  fi
-
   if [[ "$_ARCHENEMY_DRY_RUN" == true ]]; then
     log_info "Dry run active; skipping installation for $manifest"
     return
