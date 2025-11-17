@@ -1,6 +1,4 @@
 # System-level AUR helpers
-ufw-docker
-
 # Dotfiles dependencies
 oh-my-zsh-git
 
