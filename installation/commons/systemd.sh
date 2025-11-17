@@ -16,7 +16,7 @@ _enable_service() {
   local extra_args=("$@")
 
   if [[ "$ARCHENEMY_CHROOT_INSTALL" == true ]]; then
-    sudo systemctl enable "$unit"
+    SYSTEMD_OFFLINE=1 sudo systemctl enable "$unit"
     return
   fi
 

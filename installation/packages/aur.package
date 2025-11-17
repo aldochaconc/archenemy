@@ -3,7 +3,6 @@ ufw-docker
 
 # Dotfiles dependencies
 oh-my-zsh-git
-ghostty-bin
 
 # Desktop-related AUR packages
 hyprsunset
