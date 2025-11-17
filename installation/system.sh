@@ -64,7 +64,8 @@ _system_setup_first_run_privileges() {
     log_error "Missing sudoers template at $template"
     exit 1
   fi
-  run_cmd sed -e "s|__SUDOERS_FILE__|$sudoers_file|g" -e "s|__USER__|$USER|g" "$template" |
+  local target_user="${ARCHENEMY_PRIMARY_USER:-${SUDO_USER:-$USER}}"
+  run_cmd sed -e "s|__SUDOERS_FILE__|$sudoers_file|g" -e "s|__USER__|$target_user|g" "$template" |
     run_cmd sudo tee "$sudoers_file" >/dev/null
   run_cmd sudo chmod 440 "$sudoers_file"
 }
