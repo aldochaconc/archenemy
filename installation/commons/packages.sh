@@ -19,12 +19,41 @@ _install_pacman_packages() {
   run_cmd sudo pacman -S --noconfirm --needed "$@"
 }
 
+_aur_command_prefix() {
+  local aur_user
+  aur_user="$(archenemy_get_primary_user)"
+  if [[ "$aur_user" == "root" || -z "$aur_user" ]]; then
+    aur_user="archenemy-aur"
+  fi
+  if [[ "$EUID" -eq 0 ]]; then
+    if ! id -u "$aur_user" >/dev/null 2>&1; then
+      log_error "AUR builder user '$aur_user' not found. Ensure the system module ran first."
+      exit 1
+    fi
+    printf 'sudo\0-H\0-u\0%s' "$aur_user"
+  else
+    printf ''
+  fi
+}
+
+_run_as_aur_user() {
+  local prefix
+  prefix="$(_aur_command_prefix)"
+  if [[ -n "$prefix" ]]; then
+    # shellcheck disable=SC2206
+    IFS=$'\0' read -r -a cmd_prefix <<<"$prefix"
+    run_cmd "${cmd_prefix[@]}" "$@"
+  else
+    run_cmd "$@"
+  fi
+}
+
 _install_aur_packages() {
   if [[ $# -eq 0 ]]; then
     return 0
   fi
   log_info "Installing AUR packages: $*"
-  run_cmd yay -S --noconfirm --needed "$@"
+  _run_as_aur_user yay -S --noconfirm --needed "$@"
 }
 
 _archenemy_query_packages_with_pacman() {
@@ -36,7 +65,7 @@ _archenemy_query_packages_with_pacman() {
 _archenemy_query_packages_with_yay() {
   local packages=("$@")
   [[ ${#packages[@]} -eq 0 ]] && return
-  run_query_cmd yay -Si "${packages[@]}"
+  _run_as_aur_user yay -Si "${packages[@]}"
 }
 
 _install_packages_from_manifest() {
