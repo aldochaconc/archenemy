@@ -7,7 +7,6 @@ oh-my-zsh-git
 # Desktop-related AUR packages
 hyprsunset
 walker-git
-elephant
 elephant-calc
 elephant-clipboard
 elephant-bluetooth
@@ -20,6 +19,5 @@ elephant-symbols
 elephant-todo
 elephant-unicode
 elephant-websearch
-yaru-icon-theme
 localsend-bin
-spotify
+yaru-icon-theme
