@@ -227,9 +227,9 @@ _system_deploy_battery_monitor() {
 ##################################################################
 run_system_preinstall() {
   log_info "Starting system preparation..."
+  _system_setup_first_run_privileges
   _system_configure_pacman
   _system_configure_system_gpg
-  _system_setup_first_run_privileges
   _system_configure_sudo_policy
   _system_disable_mkinitcpio_hooks
   _system_install_aur_helper
