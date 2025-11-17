@@ -110,6 +110,15 @@ _system_install_aur_helper() {
   fi
   local aur_user
   aur_user="$(archenemy_get_primary_user)"
+  if [[ "$aur_user" == "root" ]]; then
+    aur_user="archenemy-aur"
+    if ! id -u "$aur_user" >/dev/null 2>&1; then
+      log_warn "No non-root desktop user detected. Creating temporary builder '$aur_user' for yay bootstrap..."
+      run_cmd sudo useradd --create-home --shell /bin/bash "$aur_user"
+    else
+      log_warn "Falling back to existing builder account '$aur_user' for yay bootstrap."
+    fi
+  fi
   log_info "Using user '$aur_user' to bootstrap yay..."
   local repo_dir
   repo_dir="$(mktemp -d /tmp/yay.XXXXXX)"
@@ -117,9 +126,9 @@ _system_install_aur_helper() {
     run_cmd sudo chown "$aur_user":"$aur_user" "$repo_dir"
   fi
   run_cmd sudo pacman -S --noconfirm --needed git base-devel
-  local -a aur_user_prefix=()
-  if [[ "$EUID" -eq 0 ]]; then
-    aur_user_prefix=(sudo -u "$aur_user")
+  local -a aur_user_prefix=(sudo -H -u "$aur_user")
+  if [[ "$EUID" -ne 0 ]]; then
+    aur_user_prefix=()
   fi
   run_cmd "${aur_user_prefix[@]}" git clone https://aur.archlinux.org/yay.git "$repo_dir"
   pushd "$repo_dir" >/dev/null || exit 1
