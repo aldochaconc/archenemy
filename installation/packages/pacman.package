@@ -119,9 +119,6 @@ gvfs-afc
 ifuse
 libimobiledevice
 usbmuxd
-blender
-inkscape
 kdenlive
-obs-studio
 vlc
 desktop-file-utils
