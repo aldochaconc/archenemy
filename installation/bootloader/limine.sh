@@ -38,11 +38,18 @@ archenemy_bootloader_configure_limine_and_snapper() {
   archenemy_bootloader_write_limine_default_file "$boot_mode" "$esp_path"
   archenemy_bootloader_reset_limine_conf
 
+  # Snapper often relies on D-Bus; in the chrooted preinstall environment the
+  # service bus may not be available, so prefer --no-dbus when supported.
+  local snapper_base_cmd=(sudo snapper)
+  if snapper --help 2>&1 | grep -q -- "--no-dbus"; then
+    snapper_base_cmd=(sudo snapper --no-dbus)
+  fi
+
   if ! sudo snapper list-configs 2>/dev/null | grep -q "root"; then
-    run_cmd sudo snapper -c root create-config /
+    run_cmd "${snapper_base_cmd[@]}" -c root create-config /
   fi
   if ! sudo snapper list-configs 2>/dev/null | grep -q "home"; then
-    run_cmd sudo snapper -c home create-config /home
+    run_cmd "${snapper_base_cmd[@]}" -c home create-config /home
   fi
 
   run_cmd sudo sed -i 's/^TIMELINE_CREATE="yes"/TIMELINE_CREATE="no"/' /etc/snapper/configs/{root,home}
