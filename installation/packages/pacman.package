@@ -39,7 +39,6 @@ ddcutil
 ufw
 openssh
 power-profiles-daemon
-ufw-docker
 
 # Bootloader & snapshot tooling
 limine

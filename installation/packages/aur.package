@@ -1,6 +1,7 @@
 # System-level AUR helpers
 # Dotfiles dependencies
 oh-my-zsh-git
+ufw-docker
 
 # Desktop-related AUR packages
 hyprsunset
