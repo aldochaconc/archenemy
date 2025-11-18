@@ -60,10 +60,14 @@ _system_setup_first_run_privileges() {
   log_info "Rendering temporary sudo privileges..."
   local sudoers_file="/etc/sudoers.d/archenemy-first-run"
   local target_user="${ARCHENEMY_PRIMARY_USER:-${SUDO_USER:-$USER}}"
-  # Write a minimal sudoers entry granting passwordless sudo during the first
+  # Write minimal sudoers entries granting passwordless sudo during the first
   # run. The cleanup module removes this file after postinstall completes.
-  local sudoers_line="$target_user ALL=(ALL) NOPASSWD: ALL"
-  printf '%s\n' "$sudoers_line" | sudo tee "$sudoers_file" >/dev/null
+  #  - target_user can run sudo without a password
+  #  - root can run commands as target_user (for AUR builds) without a password
+  cat <<EOF | sudo tee "$sudoers_file" >/dev/null
+$target_user ALL=(ALL) NOPASSWD: ALL
+root ALL=($target_user) NOPASSWD: ALL
+EOF
   run_cmd sudo chmod 440 "$sudoers_file"
 }
 

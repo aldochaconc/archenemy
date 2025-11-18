@@ -46,10 +46,14 @@ archenemy_bootloader_configure_limine_and_snapper() {
   fi
 
   if ! sudo snapper list-configs 2>/dev/null | grep -q "root"; then
-    run_cmd "${snapper_base_cmd[@]}" -c root create-config /
+    if ! "${snapper_base_cmd[@]}" -c root create-config /; then
+      log_info "Snapper root config already exists or cannot be created; continuing."
+    fi
   fi
   if ! sudo snapper list-configs 2>/dev/null | grep -q "home"; then
-    run_cmd "${snapper_base_cmd[@]}" -c home create-config /home
+    if ! "${snapper_base_cmd[@]}" -c home create-config /home; then
+      log_info "Snapper home config already exists or cannot be created; continuing."
+    fi
   fi
 
   run_cmd sudo sed -i 's/^TIMELINE_CREATE="yes"/TIMELINE_CREATE="no"/' /etc/snapper/configs/{root,home}
