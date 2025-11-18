@@ -16,7 +16,10 @@ _enable_service() {
   local extra_args=("$@")
 
   if [[ "$ARCHENEMY_CHROOT_INSTALL" == true ]]; then
-    run_cmd sudo env SYSTEMD_OFFLINE=1 systemctl --system --offline enable "$unit"
+    # Older systemd builds (including some archinstall environments) do not
+    # support the --offline flag. SYSTEMD_OFFLINE=1 is sufficient for our
+    # chroot use case, so avoid the extra flag for compatibility.
+    run_cmd sudo env SYSTEMD_OFFLINE=1 systemctl --system enable "$unit"
     return
   fi
 
