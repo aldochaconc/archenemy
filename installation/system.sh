@@ -59,13 +59,10 @@ _system_configure_system_gpg() {
 _system_setup_first_run_privileges() {
   log_info "Rendering temporary sudo privileges..."
   local sudoers_file="/etc/sudoers.d/archenemy-first-run"
-  local template="$SYSTEM_DEFAULTS_DIR/sudoers/archenemy-first-run"
-  if [[ ! -f "$template" ]]; then
-    log_error "Missing sudoers template at $template"
-    exit 1
-  fi
   local target_user="${ARCHENEMY_PRIMARY_USER:-${SUDO_USER:-$USER}}"
-  run_cmd sed -e "s|__SUDOERS_FILE__|$sudoers_file|g" -e "s|__USER__|$target_user|g" "$template" |
+  # Write a minimal sudoers entry granting passwordless sudo during the first
+  # run. The cleanup module removes this file after postinstall completes.
+  run_cmd printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$target_user" |
     run_cmd sudo tee "$sudoers_file" >/dev/null
   run_cmd sudo chmod 440 "$sudoers_file"
 }
