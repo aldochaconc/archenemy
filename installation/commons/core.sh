@@ -85,6 +85,18 @@ parse_cli_args() {
 run_cmd() {
   if [[ "$_ARCHENEMY_DRY_RUN" == true ]]; then
     log_info "[DRY RUN] $*"
+    return 0
+  fi
+
+  # When a log file is configured, mirror command output (stdout + stderr)
+  # both to the terminal and to the installer log so failures like
+  # "error: target not found" are visible in archenemy-install.log.
+  if [[ -n "${ARCHENEMY_INSTALL_LOG_FILE:-}" ]]; then
+    # Echo the command itself for context.
+    printf '$ %s\n' "$*" | tee -a "$ARCHENEMY_INSTALL_LOG_FILE"
+    # Pipe command output through tee; with `set -o pipefail` the overall
+    # exit status will still propagate to the ERR trap.
+    "$@" 2>&1 | tee -a "$ARCHENEMY_INSTALL_LOG_FILE"
   else
     "$@"
   fi
@@ -92,7 +104,12 @@ run_cmd() {
 
 run_query_cmd() {
   log_info "[QUERY] $*"
-  "$@"
+  if [[ -n "${ARCHENEMY_INSTALL_LOG_FILE:-}" ]]; then
+    printf '$ %s\n' "$*" | tee -a "$ARCHENEMY_INSTALL_LOG_FILE"
+    "$@" 2>&1 | tee -a "$ARCHENEMY_INSTALL_LOG_FILE"
+  else
+    "$@"
+  fi
 }
 
 _archenemy_handle_error() {
