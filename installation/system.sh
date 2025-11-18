@@ -62,8 +62,8 @@ _system_setup_first_run_privileges() {
   local target_user="${ARCHENEMY_PRIMARY_USER:-${SUDO_USER:-$USER}}"
   # Write a minimal sudoers entry granting passwordless sudo during the first
   # run. The cleanup module removes this file after postinstall completes.
-  run_cmd printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$target_user" |
-    run_cmd sudo tee "$sudoers_file" >/dev/null
+  local sudoers_line="$target_user ALL=(ALL) NOPASSWD: ALL"
+  printf '%s\n' "$sudoers_line" | sudo tee "$sudoers_file" >/dev/null
   run_cmd sudo chmod 440 "$sudoers_file"
 }
 
